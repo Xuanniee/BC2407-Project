@@ -3,9 +3,13 @@
 library(Hmisc)
 library(data.table)
 library(ggplot2)
+library(neuralnet)
+library(dplyr)
+library(caret)
+library(nnet)
 
 # Importing of Data
-setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project")
+setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -20,6 +24,10 @@ churnData$City <- as.character(churnData$City)
 
 # Dropping Variables that are not relevant for our analysis
 churnData$Customer.ID <- NULL
+churnData$Latitude <- NULL
+churnData$Longitude <- NULL
+churnData$City <- NULL
+churnData$Zip.Code <- NULL
 
 ## Convert all Whitespaces into NA
 churnData[churnData==""] <- NA
@@ -190,7 +198,16 @@ churnData$Multiple.Lines <- droplevels(churnData$Multiple.Lines)
 # Verify no more Missing for entire dataset
 sum(is.na(churnData))
 
+# Remove the Whitespace in Offer A/B/C/D/E
+levels(churnData$Offer) <- c(levels(churnData$Offer), "Offer.A", "Offer.B", "Offer.C", "Offer.D", "Offer.E")
+churnData$Offer[churnData$Offer == "Offer A"] <- "Offer.A"
+churnData$Offer[churnData$Offer == "Offer B"] <- "Offer.B"
+churnData$Offer[churnData$Offer == "Offer C"] <- "Offer.C"
+churnData$Offer[churnData$Offer == "Offer D"] <- "Offer.D"
+churnData$Offer[churnData$Offer == "Offer E"] <- "Offer.E"
 
+# Remove the Old Labels
+churnData$Offer <- droplevels(churnData$Offer)
 
 #################################### Data Visualisation: Univariate Categorical ####################################
 
@@ -741,6 +758,127 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
 
 ### Neural Networks Model ########################################################################################################################
 
+# Setting the Threshold for Data Usage
+quantile(churnData$Avg.Monthly.GB.Download, probs = c(0.25, 0.50, 0.75))
+lowDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.25)
+highDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.75)
+
+# Setting the Threshold for Monthly Long Distance Charges
+quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
+lowLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.25)
+highLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.75)
+
+# Setting for Threshold for Extra Data Charges
+## All 0, which is why we have to fall back on the earlier thresholds
+quantile(churnData$Total.Extra.Data.Charges, probs = c(0.25, 0.50, 0.75))
+
+# Setting the Threshold for Total Long Distance Charges
+quantile(churnData$Total.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
+lowTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.25)
+highTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.75)
+
+# Creating a New Dependent Variable, Customer's Desired Bundle, to predict Compatibility
+churnData$Most.Compatible.Bundle <- NA
+levels(churnData$Most.Compatible.Bundle) <- c("Young Adults", "Pioneer Generations", "Family Bundle", 
+                                              "Gen Z Streamers", "Frequent Fliers", "Silver Surfers",
+                                              "Average Bundle")
+
+## Determining their Optimal Bundle ############################################################################################################
+
+# Initial Number of People without Bundle
+sum(is.na(churnData$Most.Compatible.Bundle))
+
+# Frequent Fliers
+churnData$Most.Compatible.Bundle[churnData$Total.Long.Distance.Charges > highTotalLongDistThreshold] <- "Frequent Fliers"
+
+# Young Adults - Also with Unlimited Data
+churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges < lowLongDistanceThreshold & churnData$Unlimited.Data == "Yes"] <- "Young Adults"
+
+# Pioneer Generation - Discounts due to Age
+churnData$Most.Compatible.Bundle[churnData$Age > 60 & churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Pioneer Generation"
+
+# Family Bundle
+churnData$Most.Compatible.Bundle[churnData$Multiple.Lines == "Yes" & churnData$Number.of.Dependents != "0" & churnData$Married == "Yes"] <- "Family Bundle"
+
+# Gen Z
+churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & (churnData$Streaming.Movies == "Yes" | churnData$Streaming.Music == "Yes" | churnData$Streaming.TV == "Yes")] <- "Gen Z Streamers"
+
+# Silver Surfers - Age not a Factor, no Discounts for Age
+churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Silver Surfers"
+
+# Average Bundle - For now, if no Special Terms
+churnData$Most.Compatible.Bundle[is.na(churnData$Most.Compatible.Bundle)] <- "Average Bundle"
+
+# Convert the New Dependent Variable into a Factor Variable
+churnData$Most.Compatible.Bundle <- as.factor(churnData$Most.Compatible.Bundle)
+# Verify all Customers should have an Mobile Bundle that is Compatible with them!!
+sum(is.na(churnData$Most.Compatible.Bundle))
+
+
+# # Create a Copy of the Dataframe to be used with the Neural Model
+# neuralChurnData <- data.frame(churnData)
+# # Ensure is a deep copy
+# tracemem(neuralChurnData) == tracemem(churnData)
+
+# Pre-processing required for NeuralNet Function ###########################################################################
+set.seed(123)
+
+## Scaling and Encoding of Variables (if necessary) for nnet
+scaledChurnData <- churnData %>% mutate(across(where(is.numeric), scale))
+
+# Train-Test Split; list = F to return a vector of indices
+trainIndex <- createDataPartition(scaledChurnData$Most.Compatible.Bundle, p = 0.7, list = FALSE)
+trainChurnData <- scaledChurnData[trainIndex, ]
+testChurnData <- scaledChurnData[-trainIndex, ]
+
+# NN model with 10 nodes in the hidden layer, no linear output and max iterations of 1000 in training
+nnet.m1 <- nnet(Most.Compatible.Bundle ~ ., 
+                data = trainChurnData, size = 10,
+                linout = FALSE, maxit = 1000)
+
+# Predictions using Neural Network Function
+predict.m1 <- predict(nnet.m1, newdata = testChurnData, type = "class")
+predict.m1 <- factor(predict.m1, levels = levels(testChurnData$Most.Compatible.Bundle))
+# Accuracy of Predictions with all Variables
+nnet.m1.accuracy <- mean(testChurnData$Most.Compatible.Bundle == predict.m1)
+nnet.m1.accuracy
+# Confusion Matrix
+nnet.m1.cm <- confusionMatrix(testChurnData$Most.Compatible.Bundle, predict.m1)
+nnet.m1.cm
+
+## VALID TILL HERE AFTERWARDS IS EXPERIMENTATION##################################################################################################
+
+## Processing Dataframe to try out alternative measure
+scaledChurnData$dummyMostCompatibleBundle <- class.ind(scaledChurnData$Most.Compatible.Bundle)
+scaledChurnData$Most.Compatible.Bundle <- NULL
+
+trainChurnData2 <- scaledChurnData[trainIndex, ]
+testChurnData2 <- scaledChurnData[-trainIndex, ]
+
+nnet.m2 <- nnet(dummyMostCompatibleBundle ~ ., 
+                data = trainChurnData2, size = 10, softmax = TRUE, entropy = TRUE,
+                linout = FALSE, maxit = 1000)
+
+# Predictions using Neural Network Function
+predict.m2 <- predict(nnet.m2, newdata = testChurnData2, type = "class")
+predict.m2 <- factor(predict.m2, levels = levels(testChurnData$Most.Compatible.Bundle))
+# Accuracy of Predictions with all Variables
+nnet.m2.accuracy <- mean(testChurnData2$dummyMostCompatibleBundle == predict.m2)
+nnet.m2.accuracy
+# Confusion Matrix
+nnet.m2.cm <- confusionMatrix(testChurnData2$dummyMostCompatibleBundle, predict.m2)
+nnet.m2.cm
+
+
+
+
+
+
+# Convert Most.Compatible.Bundle to a Numeric for Neuralnet
+churnData$Most.Compatible.Bundle <- as.numeric(churnData$Most.Compatible.Bundle)
+
+neuralnet.m1 <- neuralnet(Most.Compatible.Bundle ~ ., 
+                          data = churnData, hidden = 3, act.fct = "logistic", linear.output = FALSE)
 
 
 
@@ -752,8 +890,200 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Normalise the Continuous Variables in ChurnData, without touching the 
+scaledChurnData <- churnData %>% mutate(across(where(is.numeric), scale))
+# maxs <- apply(churnData, 2, max) 
+# mins <- apply(churnData, 2, min)
+# scaledChurnData <- as.data.frame(scale(churnData, center = mins, scale = maxs - mins))
+
+# Identify the Categorical Variables
+churnCategoricalVar <- c("Gender", "Married", "Number.of.Dependents", "Offer", "Phone.Service", "Multiple.Lines",
+                         "Internet.Service", "Internet.Type", "Online.Security", "Online.Backup", "Device.Protection.Plan",
+                         "Premium.Tech.Support", "Streaming.TV", "Streaming.Movies", "Streaming.Music", "Unlimited.Data",
+                         "Contract", "Paperless.Billing", "Payment.Method", "Customer.Status", "Churn.Category",
+                         "Churn.Reason", "Most.Compatible.Bundle")
+
+# Convert Categorical to Dummy Variables
+# Convert the predictor variables into dummy variables
+predictors <- scaledChurnData[, !(names(scaledChurnData) %in% c("Most.Compatible.Bundle", "Churn"))]
+neuralChurnData <- dummyVars(" ~ .", data = predictors)
+neuralChurnData <- as.data.frame(predict(neuralChurnData, newdata = predictors))
+
+
+neuralChurnData$Most.Compatible.Bundle <- NA
+levels(neuralChurnData$Most.Compatible.Bundle) <- c("Young Adults", "Pioneer Generations", "Family Bundle", 
+                                              "Gen Z Streamers", "Frequent Fliers", "Silver Surfers",
+                                              "Average Bundle")
+
+## Determine their Optimal Bundle
+
+# Initial Number of People without Bundle
+sum(is.na(neuralChurnData$Most.Compatible.Bundle))
+# Young Adults - Also with Unlimited Data
+neuralChurnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges < lowLongDistanceThreshold & churnData$Unlimited.Data == "Yes"] <- "Young Adults"
+
+# Pioneer Generation - Discounts due to Age
+neuralChurnData$Most.Compatible.Bundle[churnData$Age > 60 & churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Pioneer Generation"
+
+# Family Bundle
+neuralChurnData$Most.Compatible.Bundle[churnData$Multiple.Lines == "Yes" & churnData$Number.of.Dependents != "0" & churnData$Married == "Yes"] <- "Family Bundle"
+
+# Gen Z
+neuralChurnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & (churnData$Streaming.Movies == "Yes" | churnData$Streaming.Music == "Yes" | churnData$Streaming.TV == "Yes")] <- "Gen Z Streamers"
+
+
+# Silver Surfers - Age not a Factor, no Discounts for Age
+neuralChurnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Silver Surfers"
+
+# Average Bundle - For now, if no Special Terms
+neuralChurnData$Most.Compatible.Bundle[is.na(neuralChurnData$Most.Compatible.Bundle)] <- "Average Bundle"
+
+# Convert the New Dependent Variable into a Factor Variable
+neuralChurnData$Most.Compatible.Bundle <- as.factor(neuralChurnData$Most.Compatible.Bundle)
+
+# Verify all Customers should have an Mobile Bundle that is Compatible with them!!
+sum(is.na(neuralChurnData$Most.Compatible.Bundle))
+
+## Since the neuralnet library does not help us encode the categorical factors to be used in the training of our mode
+## it is necessary to encode all of the variables of type factor into a binary dummy variable via One-Hot Encoding
+## before using it in the training of our model
+# neuralNetData <- model.matrix(~ Churn.Reason + Churn.Category + Customer.Status,
+#                               data = churnData,
+#                               constrasts.arg = list(Churn.Reason=diag(nlevels(churnData$Churn.Reason)),
+#                                                     Churn.Category=diag(nlevels(churnData$Churn.Category)),
+#                                                     Customer.Status=diag(nlevels(churnData$Customer.Status))))
+# # Add the Most.Compatible.Bundle Feature
+# neuralnet$Most.Compatible.Bundle <- churnData$Most.Compatible.Bundle
+
+# Train & Test Split
+set.seed(1)
+trainIndex <- createDataPartition(neuralChurnData$Most.Compatible.Bundle, p = .7, list = FALSE)
+training <- neuralChurnData[trainIndex, ]
+testing <- neuralChurnData[-trainIndex, ]
+
+# Relabel the Variables so that there is no Whitespace
+neuralChurnData <- neuralChurnData %>% rename(
+  `Contract.Month.to.Month` = `Contract.Month-to-Month`,
+  `Contract.One.Year` = `Contract.One Year`,
+  `Contract.Two.Year` = `Contract.Two Year`,
+  `Payment.Method.Bank.Withdrawal` = `Payment.Method.Bank Withdrawal`,
+  `Payment.Method.Credit.Card` = `Payment.Method.Credit Card`,
+  `Payment.Method.Mailed.Check` = `Payment.Method.Mailed Check`,
+  `Churn.Category.Staying.Customer` = `Churn.Category.Staying Customer`,
+  `Churn.Category.New.Customer` = `Churn.Category.New Customer`,
+  `Churn.Reason.Attitude.of.service.provider` = `Churn.Reason.Attitude of service provider`,
+  `Churn.Reason.Attitude.of.support.person` = `Churn.Reason.Attitude of support person`,
+  `Churn.Reason.Competitor.had.better.devices` = `Churn.Reason.Competitor had better devices`,
+  `Churn.Reason.Competitor.made.better.offer` = `Churn.Reason.Competitor made better offer`,
+  `Churn.Reason.Competitor.offered.higher.download.speeds` = `Churn.Reason.Competitor offered higher download speeds`,
+  `Churn.Reason.Competitor.offered.more.data` = `Churn.Reason.Competitor offered more data`,
+  `Churn.Reason.Dont.know` = `Churn.Reason.Don't know`,
+  `Churn.Reason.Extra.data.charges` = `Churn.Reason.Extra data charges`,
+  `Churn.Reason.Lack.of.affordable.download.upload.speed` = `Churn.Reason.Lack of affordable download/upload speed`,
+  `Churn.Reason.Lack.of.self.service.on.Website` = `Churn.Reason.Lack of self-service on Website`,
+  `Churn.Reason.Limited.range.of.services` = `Churn.Reason.Limited range of services`,
+  `Churn.Reason.Long.distance.charges` = `Churn.Reason.Long distance charges`,
+  `Churn.Reason.Network.reliability` = `Churn.Reason.Network reliability`,
+  `Churn.Reason.Poor.expertise.of.online.support` = `Churn.Reason.Poor expertise of online support`,
+  `Churn.Reason.Poor.expertise.of.phone.support` = `Churn.Reason.Poor expertise of phone support`,
+  `Churn.Reason.Price.too.high` = `Churn.Reason.Price too high`,
+  `Churn.Reason.Product.dissatisfaction` = `Churn.Reason.Product dissatisfaction`,
+  `Churn.Reason.Service.dissatisfaction` = `Churn.Reason.Service dissatisfaction`,
+  `Churn.Reason.Staying.Customer` = `Churn.Reason.Staying Customer`,
+  `Churn.Reason.New.Customer` = `Churn.Reason.New Customer`,
+  `Device.Protection.Plan.No.Internet.Equipment` = `Device.Protection.Plan.No Internet Equipment`,
+  `Online.Backup.No.Internet.Service` = `Online.Backup.No Internet Service`,
+  `Online.Security.No.Internet.Service` = `Online.Security.No Internet Service`,
+  `Internet.Type.Fiber.Optic` = `Internet.Type.Fiber Optic`
+)
+
+# Train the Neural Network to help predict the Optimum Bundle
+neuralVars <- names(neuralChurnData)
+neuralnet.m1 <- neuralnet(Most.Compatible.Bundle ~ Gender.Female + Gender.Male + Age + Married.No + Married.Yes
+                          + Number.of.Dependents.0 + Number.of.Dependents.1 + Number.of.Dependents.2 + Number.of.Dependents.3
+                          + Number.of.Dependents.4 + Number.of.Dependents.5 + Number.of.Dependents.6 + Number.of.Dependents.7
+                          + Number.of.Dependents.8 + Number.of.Dependents.9 + Number.of.Referrals + Tenure.in.Months
+                          + Offer.None + Offer.Offer.A + Offer.Offer.B + Offer.Offer.C + Offer.Offer.D + Offer.Offer.E
+                          + Phone.Service.No + Phone.Service.Yes + Avg.Monthly.Long.Distance.Charges + Multiple.Lines.No
+                          + Multiple.Lines.Yes + Churn.Category.Attitude, 
+                          data = training, hidden = 3, err.fct = "ce", linear.output = FALSE)
+
+neuralnet.m1 <- neuralnet(Most.Compatible.Bundle ~ ., 
+                          data = training, hidden = 3, err.fct = "ce", linear.output = FALSE)
+predictions <- predict(neuralnet.m1, )
+
+
+# Linear Regression
+m1 <- glm(Customer.Status ~ . - Churn.Category - Churn.Reason - Zip.Code - Latitude - Longitude - City, 
+          data = churnData, family = binomial)
+
+
+m2 <- glm(Customer.Status ~ . - Churn.Category - Churn.Reason, 
+          data = churnData, family = binomial)
+
+summary(m1)
+
+summary(m2)
+
+competitorChurnData <- churnData[churnData$Churn.Category == "Competitor", ]
+summary(competitorChurnData)
+
+# ggplot(competitorChurnData, aes(x = Customer.Status, y = Churn.Reason, fill = Customer.Status)) +
+#   # geom_violin() +
+#   geom_boxplot(width = 0.5,
+#                fill = "Orange",
+#                outlier.colour = "Orange",
+#                outlier.size = 1.5) +
+#   labs(x = "Customer.Status",
+#        y = "Churn.Reason",
+#        title = "Relationship between Churn.Reason & Customer.Status")
+
+
+# Phone.Service against Customer.Status
+ggplot(competitorChurnData, aes(x = Churn.Reason, fill = Customer.Status)) +
+  geom_bar(position = "stack") +
+  labs(x = "Churn.Reason",
+       y = "Count",
+       title = "Relationship between Churn.Reason and Customer Churn") +
+  theme_minimal()
+
+# Threshold > 75th Percentile --> Gives Data
+# Score based on percetile, >75 means 3, 50th is 2, 25th is 1!!
 
 ## Not sure how to do EDA with City since Char
+
+
+
+
 
 
 
