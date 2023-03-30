@@ -756,7 +756,11 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
        y = "Total.Revenue",
        title = "Relationship between Total.Revenue & Customer.Status")
 
-### Neural Networks Model ########################################################################################################################
+### Machine Learning Models ########################################################################################################################
+
+
+
+
 
 # Setting the Threshold for Data Usage
 quantile(churnData$Avg.Monthly.GB.Download, probs = c(0.25, 0.50, 0.75))
@@ -788,8 +792,13 @@ levels(churnData$Most.Compatible.Bundle) <- c("Young Adults", "Pioneer Generatio
 # Initial Number of People without Bundle
 sum(is.na(churnData$Most.Compatible.Bundle))
 
-# Frequent Fliers
-churnData$Most.Compatible.Bundle[churnData$Total.Long.Distance.Charges > highTotalLongDistThreshold] <- "Frequent Fliers"
+
+# Frequent Fliers - Select rows where Total.Long.Distance.Charges is greater than 20 with a 80% probability
+filteredIndices <- churnData %>%
+  filter(Total.Long.Distance.Charges > highTotalLongDistThreshold) %>%
+  sample_frac(0.8)
+#churnData$Most.Compatible.Bundle[churnData$Total.Long.Distance.Charges > highTotalLongDistThreshold] <- "Frequent Fliers"
+churnData$Most.Compatible.Bundle[rowIndices] <- "Frequent Fliers"
 
 # Young Adults - Also with Unlimited Data
 churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges < lowLongDistanceThreshold & churnData$Unlimited.Data == "Yes"] <- "Young Adults"
@@ -881,6 +890,7 @@ neuralnet.m1 <- neuralnet(Most.Compatible.Bundle ~ .,
                           data = churnData, hidden = 3, act.fct = "logistic", linear.output = FALSE)
 
 
+## Random Forest ##########################################################################################
 
 
 
@@ -1027,6 +1037,7 @@ neuralChurnData <- neuralChurnData %>% rename(
 )
 
 # Train the Neural Network to help predict the Optimum Bundle
+## NeuralNet 
 neuralVars <- names(neuralChurnData)
 neuralnet.m1 <- neuralnet(Most.Compatible.Bundle ~ Gender.Female + Gender.Male + Age + Married.No + Married.Yes
                           + Number.of.Dependents.0 + Number.of.Dependents.1 + Number.of.Dependents.2 + Number.of.Dependents.3
