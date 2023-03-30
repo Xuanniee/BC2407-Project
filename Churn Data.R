@@ -19,15 +19,14 @@ churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.
 # 3. City ~ Char instead of Factor
 
 #################################################### Data Cleaning Phase ##########################################################################
-churnData$Number.of.Dependents <- as.integer(churnData$Number.of.Dependents)
-#churnData$City <- as.character(churnData$City)
 churnData$City <- factor(churnData$City)
+churnData$Number.of.Dependents <- factor(churnData$Number.of.Dependents)
 
 # Dropping Variables that are not relevant for our analysis
 churnData$Customer.ID <- NULL
 churnData$Latitude <- NULL
 churnData$Longitude <- NULL
-churnData$City <- NULL
+#churnData$City <- NULL
 churnData$Zip.Code <- NULL
 
 ## Convert all Whitespaces into NA
@@ -763,6 +762,40 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
 
 ### Extra EDA ####################################################################################################################################
 
+df.actionable.churn = subset(churnData, Churn.Reason %in% actionable.reasons)
+nrow.actionable = nrow(df.actionable.churn)
+df.stayed.downsample = sample_n(subset(churnData, Churn.Reason=='Staying Customer'), nrow.actionable)
+df.combine = rbind(df.actionable.churn, df.stayed.downsample)
+nrow(df.combine)
+
+set.seed(123)
+df.combine$Y <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
+df.combine$Count <- NULL
+df.combine$Customer.Status.Temp <- NULL
+df.combine$Customer.Status <- NULL
+df.combine$Churn.Reason <- NULL
+df.combine$Churn.Status <- NULL
+df.combine$Churn.Category <- NULL
+df.combine$Usage.Charge.Ratio <- NULL
+df.combine$Number.of.Referrals <- NULL
+df.combine$Offer <- NULL
+df.combine$Payment.Method <- NULL
+df.combine$Paperless.Billing <- NULL
+#df.combine$City <- NULL
+df.combine$Service.Count <- as.numeric(df.combine$Service.Count)
+str(df.combine)
+
+model <- glm(Y ~ ., data=df.combine, family='binomial')
+options(max.print=5000)
+summary(model)
+
+
+ggplot(subset(churnData, Churn.Reason %in% c('Staying Customer', 'New Customer', 'Competitor made better offer', 'Extra data charges', 'Competitor offered more data')), aes(x=Churn.Reason, y=Count, fill=Unlimited.Data)) +
+  geom_bar(position = "fill",stat = "identity") +
+  labs(x = "Churn.Reason",
+       y = "Proportion",
+       title = "Proportion of Unlimited.Data for each Churn.Reason")
+
 ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
   geom_violin() +
   geom_boxplot(width = 0.1,
@@ -843,7 +876,6 @@ churnData$Service.Count = factor(
 )
 
 
-
 churnData$Count <- rep(1, nrow(churnData))
 
 ggplot(churnData, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
@@ -865,6 +897,15 @@ ggplot(subset(churnData, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Stat
        y = "Avg.Monthly.GB.Download",
        title = "Relationship between Avg.Monthly.GB.Download & Customer.Status for Age<30")
 
+# Number of Dependents against Customer.Status
+churnData$Number.of.Dependents.Bin <- as.numeric(churnData$Number.of.Dependents)-1
+churnData$Number.of.Dependents.Bin = ifelse(churnData$Number.of.Dependents.Bin < 3, churnData$Number.of.Dependents.Bin, '>=3')
+ggplot(churnData, aes(x = factor(Number.of.Dependents.Bin, levels=c('0','1','2', '>=3')), y=Count, fill = Customer.Status)) +
+  geom_bar(position = "fill",stat = "identity") +
+  labs(x = "Number.of.Dependents",
+       y = "Proportion",
+       title = "Proportion of Unlimited.Data for each Churn.Reason")
+  theme_minimal()
 
 actionable.reasons = c('Competitor had better devices', 
                        'Product dissatisfaction', 
@@ -876,33 +917,6 @@ actionable.reasons = c('Competitor had better devices',
                        'Price too high',
                        'Extra data charges')
 
-
-df.actionable.churn = subset(churnData, Churn.Reason %in% actionable.reasons)
-nrow.actionable = nrow(df.actionable.churn)
-df.stayed.downsample = sample_n(subset(churnData, Churn.Reason=='Staying Customer'), nrow.actionable)
-df.combine = rbind(df.actionable.churn, df.stayed.downsample)
-nrow(df.combine)
-
-train.size <- floor(0.75 * nrow(df.combine))
-
-set.seed(123)
-train_ind <- sample(seq_len(nrow(df.combine)), size = train.size)
-df.combine$Y <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
-df.combine$Count <- NULL
-df.combine$Customer.Status.Temp <- NULL
-df.combine$Customer.Status <- NULL
-df.combine$Churn.Reason <- NULL
-df.combine$Churn.Status <- NULL
-df.combine$Churn.Category <- NULL
-df.combine$Usage.Charge.Ratio <- NULL
-df.combine$Number.of.Referrals <- NULL
-str(df.combine)
-
-train <- df.combine[train_ind, ]
-test <- df.combine[-train_ind, ]
-
-model <- glm(Y ~ ., data=train, family='binomial')
-summary(model)
 
 ### Neural Networks Model ########################################################################################################################
 
