@@ -7,9 +7,10 @@ library(neuralnet)
 library(dplyr)
 library(caret)
 library(nnet)
+library(ggbeeswarm)
 
 # Importing of Data
-setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
+setwd("C:/Users/Siah Wee Hung/Desktop/Folders/2. School/NTU/Y2S2/BC2407 Analytics II/Project")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -18,15 +19,14 @@ churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.
 # 3. City ~ Char instead of Factor
 
 #################################################### Data Cleaning Phase ##########################################################################
-churnData$Customer.ID <- as.character(churnData$Customer.ID)
+churnData$City <- factor(churnData$City)
 churnData$Number.of.Dependents <- factor(churnData$Number.of.Dependents)
-churnData$City <- as.character(churnData$City)
 
 # Dropping Variables that are not relevant for our analysis
 churnData$Customer.ID <- NULL
 churnData$Latitude <- NULL
 churnData$Longitude <- NULL
-churnData$City <- NULL
+#churnData$City <- NULL
 churnData$Zip.Code <- NULL
 
 ## Convert all Whitespaces into NA
@@ -36,21 +36,14 @@ churnData[churnData==""] <- NA
 sum(is.na(churnData))
 
 # Check the Variables that have Missing Values
-varTable <- matrix(nrow = 37, ncol = 1, byrow = FALSE)
-colnames(varTable) <- c("Number of Missing Values")
-churnDataVariables <- c("Gender", "Age", "Married", "Number.of.Dependents", "City",
-                        "Zip.Code", "Latitude", "Longitude", "Number.of.Referrals", "Tenure.in.Months",
-                        "Offer", "Phone.Service", "Avg.Monthly.Long.Distance.Charges", "Multiple.Lines",
-                        "Internet.Service", "Internet.Type", "Avg.Monthly.GB.Download", "Online.Security",
-                        "Online.Backup", "Device.Protection.Plan", "Premium.Tech.Support", "Streaming.TV",
-                        "Streaming.Movies", "Streaming.Music", "Unlimited.Data", "Contract", "Paperless.Billing",
-                        "Payment.Method", "Monthly.Charge", "Total.Charges", "Total.Refunds", 
-                        "Total.Extra.Data.Charges", "Total.Long.Distance.Charges", "Total.Revenue",
-                        "Customer.Status", "Churn.Category", "Churn.Reason")
+churnDataVariables <- colnames(churnData) # list of column names
+numVars = length(churnDataVariables)
+varTable <- matrix(nrow = numVars, ncol = 1, byrow = FALSE)
+colnames(varTable) <- c("Number of Missing Values") # set column name
 rownames(varTable) <- churnDataVariables
 
 # Populate the Table with Missing Values
-for (index in 1:37){
+for (index in 1:numVars){
   # Fill in the Variable & Missing Values
   # varTable[index, 1] <- sum(is.na(churnData[,get(names(churnData)[index])]))
   varTable[index, 1] <- sum(is.na(churnData[churnDataVariables[index]]))
@@ -70,6 +63,7 @@ summary(churnData)
 ## 1. Impute Avg.Monthly.Long.Distance.Charges
 # According to Data Dictionary, 0 if not subscribed to Home Phone
 churnData$Avg.Monthly.Long.Distance.Charges[churnData$Phone.Service == "No"] <- 0
+# churnData$Phone.Service <- NULL
 
 # # Determine the Mean of Long Distance Charges, not removing NA, just not including in mean calculation
 # longDistChargesMean <- mean(churnData$Avg.Monthly.Long.Distance.Charges, na.rm = TRUE)
@@ -84,6 +78,8 @@ sum(is.na(churnData$Avg.Monthly.Long.Distance.Charges))
 ## 2. Impute Avg.Monthly.GB.Download
 # 0 if not subscribed to Internet Plan
 churnData$Avg.Monthly.GB.Download[churnData$Internet.Service == "No"] <- 0
+# churnData$Internet.Service <- NULL
+
 # Similarly, we can impute the Avg.Monthly.GB.Download as well. But instead of choosing mean, we will impute
 # it with Median since the spread of GB Download is larger from 2GB to 85GB.
 
@@ -98,8 +94,13 @@ sum(is.na(churnData$Avg.Monthly.GB.Download))
 
 ## 3. Impute Churn.Category
 # Increase the Number of Factors to allow for Different Factors
+# -------------------------- 
+# why dont we just drop those that don't churn?
+# --------------------------
 levels(churnData$Churn.Category) <- c(levels(churnData$Churn.Category), "Staying Customer")
 levels(churnData$Churn.Category) <- c(levels(churnData$Churn.Category), "New Customer")
+
+
 # The high missing values in Churn.Category and Churn.Reason can be attributed to New & Loyal Customers
 churnData$Churn.Category[churnData$Customer.Status == "Stayed"] <- "Staying Customer"
 churnData$Churn.Category[churnData$Customer.Status == "Joined"] <- "New Customer"
@@ -277,8 +278,8 @@ ggplot(data = churnData, aes(x = Internet.Type, fill = Internet.Type)) +
 ggplot(data = churnData, aes(x = Online.Security, fill = Online.Security)) +
   geom_bar() +
   scale_fill_manual("Online.Security", values = c("No Internet Service" = "Pink", 
-                                                "Yes" = "Light Blue",
-                                                "No" = "Yellow")) +
+                                                  "Yes" = "Light Blue",
+                                                  "No" = "Yellow")) +
   labs(title = "Proportion of Customer who subscribed to Security Plan")
 
 # Online.Backup
@@ -286,8 +287,8 @@ ggplot(data = churnData, aes(x = Online.Security, fill = Online.Security)) +
 ggplot(data = churnData, aes(x = Online.Backup, fill = Online.Backup)) +
   geom_bar() +
   scale_fill_manual("Online.Backup", values = c("No Internet Service" = "Pink", 
-                                                  "Yes" = "Light Blue",
-                                                  "No" = "Yellow")) +
+                                                "Yes" = "Light Blue",
+                                                "No" = "Yellow")) +
   labs(title = "Proportion of Customer who subscribed to Backup Plan")
 
 # Device.Protection.Plan
@@ -295,8 +296,8 @@ ggplot(data = churnData, aes(x = Online.Backup, fill = Online.Backup)) +
 ggplot(data = churnData, aes(x = Device.Protection.Plan, fill = Device.Protection.Plan)) +
   geom_bar() +
   scale_fill_manual("Device.Protection.Plan", values = c("No Internet Equipment" = "Pink", 
-                                                "Yes" = "Light Blue",
-                                                "No" = "Yellow")) +
+                                                         "Yes" = "Light Blue",
+                                                         "No" = "Yellow")) +
   labs(title = "Proportion of Customer who subscribed to Device Protection Plan")
 
 # Premium.Tech.Support
@@ -364,8 +365,8 @@ ggplot(data = churnData, aes(x = Payment.Method, fill = Payment.Method)) +
 ggplot(data = churnData, aes(x = Customer.Status, fill = Customer.Status)) +
   geom_bar() +
   scale_fill_manual("Customer.Status", values = c("Churned" = "Pink", 
-                                                 "Stayed" = "Light Blue",
-                                                 "Joined" = "Yellow")) +
+                                                  "Stayed" = "Light Blue",
+                                                  "Joined" = "Yellow")) +
   labs(title = "Proportion of Customer by Status at end of quarter")
 
 # Churn.Category
@@ -660,10 +661,11 @@ ggplot(churnData, aes(x = Customer.Status, y = Number.of.Referrals, fill = Custo
 # Tenure.in.Months vs Customer.Status
 ggplot(churnData, aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
   geom_violin() +
-  geom_boxplot(width = 0.5,
+  geom_boxplot(width = 0.1,
                fill = "Orange",
                outlier.colour = "Orange",
-               outlier.size = 1.5) +
+               outlier.size = 1.5,
+               alpha = 0.3) +
   labs(x = "Customer.Status",
        y = "Tenure.in.Months",
        title = "Relationship between Tenure.in.Months & Customer.Status")
@@ -671,7 +673,7 @@ ggplot(churnData, aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer
 # Avg.Monthly.Long.Distance.Charges vs Customer.Status
 ggplot(churnData, aes(x = Customer.Status, y = Avg.Monthly.Long.Distance.Charges, fill = Customer.Status)) +
   geom_violin() +
-  geom_boxplot(width = 0.5,
+  geom_boxplot(width = 0.1,
                fill = "Orange",
                outlier.colour = "Orange",
                outlier.size = 1.5) +
@@ -696,7 +698,8 @@ ggplot(churnData, aes(x = Customer.Status, y = Monthly.Charge, fill = Customer.S
   geom_boxplot(width = 0.5,
                fill = "Orange",
                outlier.colour = "Orange",
-               outlier.size = 1.5) +
+               outlier.size = 1.5,
+               alpha = 0.5) +
   labs(x = "Customer.Status",
        y = "Monthly.Charge",
        title = "Relationship between Monthly.Charge & Customer.Status")
@@ -755,6 +758,165 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
   labs(x = "Customer.Status",
        y = "Total.Revenue",
        title = "Relationship between Total.Revenue & Customer.Status")
+
+
+### Extra EDA ####################################################################################################################################
+
+df.actionable.churn = subset(churnData, Churn.Reason %in% actionable.reasons)
+nrow.actionable = nrow(df.actionable.churn)
+df.stayed.downsample = sample_n(subset(churnData, Churn.Reason=='Staying Customer'), nrow.actionable)
+df.combine = rbind(df.actionable.churn, df.stayed.downsample)
+nrow(df.combine)
+
+set.seed(123)
+df.combine$Y <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
+df.combine$Count <- NULL
+df.combine$Customer.Status.Temp <- NULL
+df.combine$Customer.Status <- NULL
+df.combine$Churn.Reason <- NULL
+df.combine$Churn.Status <- NULL
+df.combine$Churn.Category <- NULL
+df.combine$Usage.Charge.Ratio <- NULL
+df.combine$Number.of.Referrals <- NULL
+df.combine$Offer <- NULL
+df.combine$Payment.Method <- NULL
+df.combine$Paperless.Billing <- NULL
+#df.combine$City <- NULL
+df.combine$Service.Count <- as.numeric(df.combine$Service.Count)
+str(df.combine)
+
+model <- glm(Y ~ ., data=df.combine, family='binomial')
+options(max.print=5000)
+summary(model)
+
+
+ggplot(subset(churnData, Churn.Reason %in% c('Staying Customer', 'New Customer', 'Competitor made better offer', 'Extra data charges', 'Competitor offered more data')), aes(x=Churn.Reason, y=Count, fill=Unlimited.Data)) +
+  geom_bar(position = "fill",stat = "identity") +
+  labs(x = "Churn.Reason",
+       y = "Proportion",
+       title = "Proportion of Unlimited.Data for each Churn.Reason")
+
+ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5,
+               alpha = 0.3) +
+  labs(x = "Customer.Status",
+       y = "Tenure.in.Months",
+       title = "Relationship between Tenure.in.Months & Customer.Status")
+
+
+churnData$Usage.Charge.Ratio <- pmax(churnData$Monthly.Charge / churnData$Avg.Monthly.GB.Download, rep(0, nrow(churnData)))
+churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Price too high', 'Price too high', 'Not Churned / Other reasons'))
+
+ggplot(churnData, aes(x=log(1+Usage.Charge.Ratio), fill=Customer.Status.Temp)) +
+  geom_histogram(aes(y = after_stat(c(
+    count[group==1] / sum(count[group==1]),
+    count[group==2] / sum(count[group==2])
+  ))),
+  alpha=.5, 
+  position="identity",
+  bins=60
+  ) +
+  scale_fill_manual(values=c('#00BFC4', '#F9766E')) +
+  labs(x = "log(1+Usage.Charge.Ratio)",
+       y = "Proportion",
+       title = "Relationship between Usage.Charge.Ratio & Customer.Status")
+
+ggplot(churnData, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill = Customer.Status.Temp)) +
+  geom_violin() +
+  geom_boxplot(width = 0.5,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5) +
+  scale_fill_manual(values=c('#00BFC4', '#F9766E')) +
+  labs(x = "Customer.Status",
+       y = "Usage.Charge.Ratio",
+       title = "Relationship between Usage.Charge.Ratio & Customer.Status")
+
+
+
+ggplot(churnData, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Customer.Status)) +
+  geom_violin() +
+  geom_boxplot(width = 0.5,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5) +
+  labs(x = "Customer.Status",
+       y = "Usage.Charge.Ratio",
+       title = "Relationship between Usage.Charge.Ratio & Customer.Status")
+
+
+churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Competitor offered more data', 'Competitor offered more data', 'Not Churned / Other reasons'))
+
+ggplot(churnData, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fill = Customer.Status.Temp)) +
+  geom_violin() +
+  geom_boxplot(width = 0.5,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5,
+               alpha = 0.3) +
+  labs(x = "Customer.Status",
+       y = "Avg.Monthly.GB.Download",
+       title = "Relationship between Avg.Monthly.GB.Download & Customer.Status")
+
+
+churnData$Customer.Status.Temp <- factor(ifelse(churnData$Customer.Status=='Churned', 'Churned', 'Not Churned'))
+
+churnData$Service.Count = factor(
+  ifelse(churnData$Streaming.Music=='Yes', 1, 0) + 
+    ifelse(churnData$Streaming.Movies=='Yes', 1, 0) +
+    ifelse(churnData$Streaming.TV=='Yes', 1, 0) +
+    ifelse(churnData$Premium.Tech.Support=='Yes', 1, 0) +
+    ifelse(churnData$Device.Protection.Plan=='Yes', 1, 0) +
+    ifelse(churnData$Online.Backup=='Yes', 1, 0) +
+    ifelse(churnData$Online.Security=='Yes', 1, 0)
+)
+
+
+churnData$Count <- rep(1, nrow(churnData))
+
+ggplot(churnData, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
+  geom_bar(stat = "identity")
+
+
+ggplot(churnData, aes(x = Age, y = Avg.Monthly.GB.Download)) +
+  geom_jitter(aes(color=Customer.Status.Temp), width=0.1, alpha=0.5) + 
+  scale_color_manual(values=c('Churned'='#F9766E', 'Not Churned'='#00BFC4'))
+
+ggplot(subset(churnData, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Status.Temp, fill=Customer.Status.Temp)) +
+  geom_violin() +
+  geom_boxplot(width = 0.5,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5,
+               alpha = 0.3) +
+  labs(x = "Customer.Status",
+       y = "Avg.Monthly.GB.Download",
+       title = "Relationship between Avg.Monthly.GB.Download & Customer.Status for Age<30")
+
+# Number of Dependents against Customer.Status
+churnData$Number.of.Dependents.Bin <- as.numeric(churnData$Number.of.Dependents)-1
+churnData$Number.of.Dependents.Bin = ifelse(churnData$Number.of.Dependents.Bin < 3, churnData$Number.of.Dependents.Bin, '>=3')
+ggplot(churnData, aes(x = factor(Number.of.Dependents.Bin, levels=c('0','1','2', '>=3')), y=Count, fill = Customer.Status)) +
+  geom_bar(position = "fill",stat = "identity") +
+  labs(x = "Number.of.Dependents",
+       y = "Proportion",
+       title = "Proportion of Unlimited.Data for each Churn.Reason")
+  theme_minimal()
+
+actionable.reasons = c('Competitor had better devices', 
+                       'Product dissatisfaction', 
+                       'Limited range of services', 
+                       'Competitor made better offer',
+                       'Long distance charges',
+                       'Lack of affordable download/upload speed',
+                       'Competitor offered more data',
+                       'Price too high',
+                       'Extra data charges')
+
 
 ### Neural Networks Model ########################################################################################################################
 
@@ -941,8 +1103,8 @@ neuralChurnData <- as.data.frame(predict(neuralChurnData, newdata = predictors))
 
 neuralChurnData$Most.Compatible.Bundle <- NA
 levels(neuralChurnData$Most.Compatible.Bundle) <- c("Young Adults", "Pioneer Generations", "Family Bundle", 
-                                              "Gen Z Streamers", "Frequent Fliers", "Silver Surfers",
-                                              "Average Bundle")
+                                                    "Gen Z Streamers", "Frequent Fliers", "Silver Surfers",
+                                                    "Average Bundle")
 
 ## Determine their Optimal Bundle
 
