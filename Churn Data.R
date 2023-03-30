@@ -837,6 +837,8 @@ nnet.m1 <- nnet(Most.Compatible.Bundle ~ .,
                 linout = FALSE, maxit = 1000)
 
 # Predictions using Neural Network Function
+predict.m1.probs <- predict(nnet.m1, newdata = testChurnData)
+predict.m1.probs
 predict.m1 <- predict(nnet.m1, newdata = testChurnData, type = "class")
 predict.m1 <- factor(predict.m1, levels = levels(testChurnData$Most.Compatible.Bundle))
 # Accuracy of Predictions with all Variables
