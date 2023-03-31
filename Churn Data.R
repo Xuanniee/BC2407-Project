@@ -963,9 +963,6 @@ churnData$Assigned.Bundle[churnData$Multiple.Lines == "Yes" & churnData$Number.o
 # Gen Z
 churnData$Assigned.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & (churnData$Streaming.Movies == "Yes" | churnData$Streaming.Music == "Yes" | churnData$Streaming.TV == "Yes")] <- "Gen Z Streamers"
 
-## Silver Surfers - Age not a Factor, no Discounts for Age
-# churnData$Assigned.Bundle[churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Silver Surfers"
-
 # Average Bundle - For now, if no Special Terms
 churnData$Assigned.Bundle[is.na(churnData$Assigned.Bundle)] <- "Average Bundle"
 
@@ -986,40 +983,40 @@ levels(churnData$Churn.Reason)
 
 # Better Offer - Should add 311 to YA
 sum(churnData$Assigned.Bundle == "Young Adults")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor made better offer"] <- "Young Adults"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor made better offer" & churnData$Churn == "Churned"] <- "Young Adults"
 sum(churnData$Assigned.Bundle == "Young Adults")
 
 # Higher Download Speeds - should add 100 to Family [added 99 instead]
 sum(churnData$Assigned.Bundle == "Family Bundle")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered higher download speeds"] <- "Family Bundle"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered higher download speeds" & churnData$Churn == "Churned"] <- "Family Bundle"
 sum(churnData$Assigned.Bundle == "Family Bundle")
 
 # Competitors offered more Data - Should add 117 to Average {Added less}
 sum(churnData$Assigned.Bundle == "Average Bundle")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered more data"] <- "Average Bundle"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered more data" & churnData$Churn == "Churned"] <- "Average Bundle"
 sum(churnData$Assigned.Bundle == "Average Bundle")
 
 # Extra Data Charges - Should add 39 {Added Less}
 sum(churnData$Assigned.Bundle == "Average Bundle")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Extra data charges"] <- "Average Bundle"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Extra data charges" & churnData$Churn == "Churned"] <- "Average Bundle"
 sum(churnData$Assigned.Bundle == "Average Bundle")
 
 # Lack of Affordable Upload/Downloads - Should add 30
 sum(churnData$Assigned.Bundle == "Pioneer Generation")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Lack of affordable download/upload speed"] <- "Pioneer Generation"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Lack of affordable download/upload speed" & churnData$Churn == "Churned"] <- "Pioneer Generation"
 sum(churnData$Assigned.Bundle == "Pioneer Generation")
 
 # Long Distance Charges - Should add 64
 sum(churnData$Assigned.Bundle == "Gen Z Streamers")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Long distance charges"] <- "Gen Z Streamers"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Long distance charges" & churnData$Churn == "Churned"] <- "Gen Z Streamers"
 sum(churnData$Assigned.Bundle == "Gen Z Streamers")
 
 # Price too High - Should add 78
 sum(churnData$Assigned.Bundle == "Frequent Fliers")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Price too high"] <- "Frequent Fliers"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Price too high" & churnData$Churn == "Churned"] <- "Frequent Fliers"
 sum(churnData$Assigned.Bundle == "Frequent Fliers")
 
-### Further Data Processing ########################################################################################################################
+### Machine Learning Models ########################################################################################################################
 # Predicting Churn
 churnData$City <- NULL
 set.seed(123)
