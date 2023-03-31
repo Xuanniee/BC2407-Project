@@ -1026,34 +1026,294 @@ trainIndex <- createDataPartition(churnData$Assigned.Bundle, p = 0.7, list = FAL
 trainChurnData <- churnData[trainIndex, ]
 testChurnData <- churnData[-trainIndex, ]
 
+
+# Subset 6 Datasets for 6 Mobile Plans
+## Subsetting Train Dataset
+averageTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Average Bundle")
+familyTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Family Bundle")
+fliersTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Frequent Fliers")
+genZTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Gen Z Streamers")
+pioneerTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Pioneer Generation")
+youngAdultsTrainChurnData <- subset(trainChurnData, Assigned.Bundle == "Young Adults")
+
+## Subsetting Test Dataset
+averageTestChurnData <- subset(testChurnData, Assigned.Bundle == "Average Bundle")
+familyTestChurnData <- subset(testChurnData, Assigned.Bundle == "Family Bundle")
+fliersTestChurnData <- subset(testChurnData, Assigned.Bundle == "Frequent Fliers")
+genZTestChurnData <- subset(testChurnData, Assigned.Bundle == "Gen Z Streamers")
+pioneerTestChurnData <- subset(testChurnData, Assigned.Bundle == "Pioneer Generation")
+youngAdultsTestChurnData <- subset(testChurnData, Assigned.Bundle == "Young Adults")
+
 ## Random Forest ####################################################################################################################
+## 1. Average Bundle RF Model
+
 # Fit the Random Forest Model to Predict Churn
-rfModel1 <- randomForest(Customer.Status ~ ., data = trainChurnData, importance = TRUE,
+rfModelAvg <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = averageTrainChurnData, importance = TRUE,
                          ntree = 500, mtry = 2)
-
 # Identify the Churn Probability
-predict(rfModel1, newdata = testChurnData, type = "prob")[,]
+predict(rfModelAvg, newdata = averageTestChurnData, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
-testChurnData$ProbChurn <- predict(rfModel1, newdata = testChurnData, type = "prob")[, 1] * 100
-
+averageTestChurnData$ProbChurn <- predict(rfModelAvg, newdata = averageTestChurnData, type = "prob")[, 1] * 100
+rfModelAvg.predict <- predict(rfModelAvg, newdata = averageTestChurnData)
 # Verify & view the probability of churning for the first 10 customers
-head(select(testChurnData, Customer.Status, ProbChurn), 10)
+head(select(averageTestChurnData, Churn, ProbChurn), 10)
 
 # Results
-summary(rfModel1)
-
+summary(rfModelAvg)
 # Variable Importance of Random Forest
-rf.var.impt <- importance(rfModel1)
-rf.var.impt
-varImpPlot(rfModel1)
-## 
-
+rf.var.impt <- importance(rfModelAvg)
+varImpPlot(rfModelAvg)
 # Evaluate Performance of Model
-confusionMatrix(rfModel1.predict, testChurnData$Customer.Status)
-rfModel1.m1.accuracy <- mean(testChurnData$Customer.Status == rfModel1.predict)
-cat("Accuracy of Random Forest (No Feature Selection)", rfModel1.m1.accuracy * 100, "%.\n")
+confusionMatrix(rfModelAvg.predict, averageTestChurnData$Churn)
+rfModelAvg.accuracy <- mean(averageTestChurnData$Churn == rfModelAvg.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelAvg.accuracy * 100, "%.\n")
 
 
+
+## 2. Family Bundle
+
+# Fit the Random Forest Model to Predict Churn
+rfModelFamily <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = familyTrainChurnData, importance = TRUE,
+                           ntree = 500, mtry = 2)
+# Identify the Churn Probability
+predict(rfModelFamily, newdata = familyTestChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+familyTestChurnData$ProbChurn <- predict(rfModelFamily, newdata = familyTestChurnData, type = "prob")[, 1] * 100
+rfModelFamily.predict <- predict(rfModelFamily, newdata = familyTestChurnData)
+# Verify & view the probability of churning for the first 10 customers
+head(select(familyTestChurnData, Churn, ProbChurn), 10)
+
+# Results
+summary(rfModelFamily)
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModelFamily)
+varImpPlot(rfModelFamily)
+# Evaluate Performance of Model
+confusionMatrix(rfModelFamily.predict, familyTestChurnData$Churn)
+rfModelFamily.accuracy <- mean(familyTestChurnData$Churn == rfModelFamily.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelFamily.accuracy * 100, "%.\n")
+
+
+
+## 3. Frequent Fliers
+
+# Fit the Random Forest Model to Predict Churn
+rfModelFliers <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = fliersTrainChurnData, importance = TRUE,
+                              ntree = 500, mtry = 2)
+# Identify the Churn Probability
+predict(rfModelFliers, newdata = fliersTestChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+fliersTestChurnData$ProbChurn <- predict(rfModelFliers, newdata = fliersTestChurnData, type = "prob")[, 1] * 100
+rfModelFliers.predict <- predict(rfModelFliers, newdata = fliersTestChurnData)
+# Verify & view the probability of churning for the first 10 customers
+head(select(fliersTestChurnData, Churn, ProbChurn), 10)
+
+# Results
+summary(rfModelFliers)
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModelFliers)
+varImpPlot(rfModelFliers)
+# Evaluate Performance of Model
+confusionMatrix(rfModelFliers.predict, fliersTestChurnData$Churn)
+rfModelFliers.accuracy <- mean(fliersTestChurnData$Churn == rfModelFliers.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelFliers.accuracy * 100, "%.\n")
+
+
+
+
+## 4. Gen Z Streamers
+
+# Fit the Random Forest Model to Predict Churn
+rfModelGenZ <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = genZTrainChurnData, importance = TRUE,
+                              ntree = 500, mtry = 2)
+# Identify the Churn Probability
+predict(rfModelGenZ, newdata = genZTestChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+genZTestChurnData$ProbChurn <- predict(rfModelGenZ, newdata = genZTestChurnData, type = "prob")[, 1] * 100
+rfModelGenZ.predict <- predict(rfModelGenZ, newdata = genZTestChurnData)
+# Verify & view the probability of churning for the first 10 customers
+head(select(genZTestChurnData, Churn, ProbChurn), 10)
+
+# Results
+summary(rfModelGenZ)
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModelGenZ)
+varImpPlot(rfModelGenZ)
+# Evaluate Performance of Model
+confusionMatrix(rfModelGenZ.predict, genZTestChurnData$Churn)
+rfModelGenZ.accuracy <- mean(genZTestChurnData$Churn == rfModelGenZ.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelGenZ.accuracy * 100, "%.\n")
+
+
+
+
+## 5. Pioneer Generation
+
+# Fit the Random Forest Model to Predict Churn
+rfModelPioneer <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = pioneerTrainChurnData, importance = TRUE,
+                            ntree = 500, mtry = 2)
+# Identify the Churn Probability
+predict(rfModelPioneer, newdata = pioneerTestChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+pioneerTestChurnData$ProbChurn <- predict(rfModelPioneer, newdata = pioneerTestChurnData, type = "prob")[, 1] * 100
+rfModelPioneer.predict <- predict(rfModelPioneer, newdata = pioneerTestChurnData)
+# Verify & view the probability of churning for the first 10 customers
+head(select(pioneerTestChurnData, Churn, ProbChurn), 10)
+
+# Results
+summary(rfModelPioneer)
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModelPioneer)
+varImpPlot(rfModelPioneer)
+# Evaluate Performance of Model
+confusionMatrix(rfModelPioneer.predict, pioneerTestChurnData$Churn)
+rfModelPioneer.accuracy <- mean(pioneerTestChurnData$Churn == rfModelPioneer.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelPioneer.accuracy * 100, "%.\n")
+
+
+
+
+## 6. Young Adults
+
+# Fit the Random Forest Model to Predict Churn
+rfModelYoungAdults <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = youngAdultsTrainChurnData, importance = TRUE,
+                               ntree = 500, mtry = 2)
+# Identify the Churn Probability
+predict(rfModelYoungAdults, newdata = youngAdultsTestChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+youngAdultsTestChurnData$ProbChurn <- predict(rfModelYoungAdults, newdata = youngAdultsTestChurnData, type = "prob")[, 1] * 100
+rfModelYoungAdults.predict <- predict(rfModelYoungAdults, newdata = youngAdultsTestChurnData)
+# Verify & view the probability of churning for the first 10 customers
+head(select(youngAdultsTestChurnData, Churn, ProbChurn), 10)
+
+# Results
+summary(rfModelYoungAdults)
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModelYoungAdults)
+varImpPlot(rfModelYoungAdults)
+# Evaluate Performance of Model
+confusionMatrix(rfModelYoungAdults.predict, youngAdultsTestChurnData$Churn)
+rfModelYoungAdults.accuracy <- mean(youngAdultsTestChurnData$Churn == rfModelYoungAdults.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModelYoungAdults.accuracy * 100, "%.\n")
+
+# Determine the Number of People whose Churn Probs > 80%
+rfModelAvg.numChurn <- length(averageTestChurnData$ProbChurn[averageTestChurnData$ProbChurn > 80])
+rfModelAvg.size <- nrow(averageTestChurnData)
+rfModelAvg.percentageChurn <- (rfModelAvg.numChurn/rfModelAvg.size) * 100
+
+rfModelFamily.numChurn <- length(familyTestChurnData$ProbChurn[familyTestChurnData$ProbChurn > 80])
+rfModelFamily.size <- nrow(familyTestChurnData)
+rfModelFamily.percentageChurn <- (rfModelFamily.numChurn/rfModelFamily.size) * 100
+
+rfModelFliers.numChurn <- length(fliersTestChurnData$ProbChurn[fliersTestChurnData$ProbChurn > 80])
+rfModelFliers.size <- nrow(fliersTestChurnData)
+rfModelFliers.percentageChurn <- (rfModelFliers.numChurn/rfModelFliers.size) * 100
+
+rfModelGenZ.numChurn <- length(genZTestChurnData$ProbChurn[genZTestChurnData$ProbChurn > 80])
+rfModelGenZ.size <- nrow(genZTestChurnData)
+rfModelGenZ.percentageChurn <- (rfModelGenZ.numChurn/rfModelGenZ.size) * 100
+
+rfModelPioneer.numChurn <- length(pioneerTestChurnData$ProbChurn[pioneerTestChurnData$ProbChurn > 80])
+rfModelPioneer.size <- nrow(pioneerTestChurnData)
+rfModelPioneer.percentageChurn <- (rfModelPioneer.numChurn/rfModelPioneer.size) * 100
+
+rfModelYoungAdults.numChurn <- length(youngAdultsTestChurnData$ProbChurn[youngAdultsTestChurnData$ProbChurn > 80])
+rfModelYoungAdults.size <- nrow(unique(youngAdultsTestChurnData))
+rfModelYoungAdults.percentageChurn <- (rfModelYoungAdults.numChurn/rfModelYoungAdults.size) * 100
+
+# Table for Accuracies
+modelNames <- c('rfModelAvg', 'rfModelFamily', 'rfModelFliers', 'rfModelGenZ', 'rfModelPioneer', 'rfModelYoungAdults')
+modelAccuracies <- c(rfModelAvg.accuracy, rfModelFamily.accuracy, rfModelFliers.accuracy, rfModelGenZ.accuracy, rfModelPioneer.accuracy, rfModelYoungAdults.accuracy)
+modelChurnNums <- c(rfModelAvg.numChurn, rfModelFamily.numChurn, rfModelFliers.numChurn, rfModelGenZ.numChurn, rfModelPioneer.numChurn, rfModelYoungAdults.numChurn)
+modelSize <- c(rfModelAvg.size, rfModelFamily.size, rfModelFliers.size, rfModelGenZ.size, rfModelPioneer.size, rfModelYoungAdults.size)
+modelPercentage <- c(rfModelAvg.percentageChurn, rfModelFamily.percentageChurn, rfModelFliers.percentageChurn, rfModelGenZ.percentageChurn, rfModelPioneer.percentageChurn, rfModelYoungAdults.percentageChurn)
+
+accuracyRFTable <- data.frame(Model = modelNames, Accuracy = modelAccuracies, ChurnNumbers = modelChurnNums, TestSize = modelSize, ChurnPercentage = modelPercentage)
+accuracyRFTable
+
+# Subset the People who churned from all the 6 Test Datasets
+churnAvg <- averageTestChurnData[averageTestChurnData$ProbChurn > 80, ]
+churnFamily <- familyTestChurnData[familyTestChurnData$ProbChurn > 80, ]
+churnFliers <- fliersTestChurnData[fliersTestChurnData$ProbChurn > 80, ]
+churnGenZ <- genZTestChurnData[genZTestChurnData$ProbChurn > 80, ]
+churnPioneer <- pioneerTestChurnData[pioneerTestChurnData$ProbChurn > 80, ]
+churnYoungAdults <- youngAdultsTestChurnData[youngAdultsTestChurnData$ProbChurn > 80, ]
+# Combine the Subsets into 1 Dataset
+combinedChurnOnly <- rbind(churnAvg, churnFamily, churnFliers, churnGenZ, churnPioneer, churnYoungAdults)
+
+## Run it for the other 5 Models
+# 1. Average RF
+predict(rfModelAvg, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$AverageProbChurn <- predict(rfModelAvg, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelAvg.predict2 <- predict(rfModelAvg, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelAvg.predict2, combinedChurnOnly$Churn)
+rfModelAvg.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelAvg.predict2)
+cat("Accuracy: ", rfModelAvg.accuracy2 * 100, "%.\n")
+
+# 2. Family RF
+predict(rfModelFamily, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$FamilyProbChurn <- predict(rfModelFamily, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelFamily.predict2 <- predict(rfModelFamily, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelFamily.predict2, combinedChurnOnly$Churn)
+rfModelFamily.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelFamily.predict2)
+cat("Accuracy: ", rfModelFamily.accuracy2 * 100, "%.\n")
+
+# 3. Fliers RF
+predict(rfModelFliers, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$FliersProbChurn <- predict(rfModelFliers, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelFliers.predict2 <- predict(rfModelFliers, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelFliers.predict2, combinedChurnOnly$Churn)
+rfModelFliers.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelFliers.predict2)
+cat("Accuracy: ", rfModelFliers.accuracy2 * 100, "%.\n")
+
+# 4. Gen Z
+predict(rfModelGenZ, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$GenZProbChurn <- predict(rfModelGenZ, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelGenZ.predict2 <- predict(rfModelGenZ, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelGenZ.predict2, combinedChurnOnly$Churn)
+rfModelGenZ.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelGenZ.predict2)
+cat("Accuracy: ", rfModelGenZ.accuracy2 * 100, "%.\n")
+
+# 5. Pioneer
+predict(rfModelPioneer, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$PioneerProbChurn <- predict(rfModelPioneer, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelPioneer.predict2 <- predict(rfModelPioneer, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelPioneer.predict2, combinedChurnOnly$Churn)
+rfModelPioneer.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelPioneer.predict2)
+cat("Accuracy: ", rfModelPioneer.accuracy2 * 100, "%.\n")
+
+# 6. Young Adults
+predict(rfModelYoungAdults, newdata = combinedChurnOnly, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+combinedChurnOnly$YoungAdultsProbChurn <- predict(rfModelYoungAdults, newdata = combinedChurnOnly, type = "prob")[, 1] * 100
+rfModelYoungAdults.predict2 <- predict(rfModelYoungAdults, newdata = combinedChurnOnly)
+# Evaluate Performance of Model
+confusionMatrix(rfModelYoungAdults.predict2, combinedChurnOnly$Churn)
+rfModelYoungAdults.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelYoungAdults.predict2)
+cat("Accuracy: ", rfModelYoungAdults.accuracy2 * 100, "%.\n")
+
+modelAccuracy2 <- c(rfModelAvg.accuracy2, rfModelFamily.accuracy2, rfModelFliers.accuracy2, rfModelGenZ.accuracy2, rfModelPioneer.accuracy2, rfModelYoungAdults.accuracy2)
+subsettedCombinedChurnOnly <- subset(combinedChurnOnly, select = c("AverageProbChurn", "FamilyProbChurn", "FliersProbChurn", "GenZProbChurn", "PioneerProbChurn", "YoungAdultsProbChurn"))
+# Finding Better Bundles based on lowest Churn Probs
+minCol <- apply(subsettedCombinedChurnOnly, 1, function(x) {
+  names(subsettedCombinedChurnOnly)[which.min(x)]
+})
+# Add Recommendation to Table
+subsettedCombinedChurnOnly$Recommended_Bundle <- minCol
+# Append the columns together into a new table
+accuracyRFTable2 <- rbind(Accuracy = modelAccuracy2, subsettedCombinedChurnOnly)
+accuracyRFTable2$Recommended_Bundle[1] <- NA
+accuracyRFTable2
 
 ## Logistics Regression ####################################################################################################################
 # Feature Selection
