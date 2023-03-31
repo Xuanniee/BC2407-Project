@@ -3,14 +3,13 @@
 library(Hmisc)
 library(data.table)
 library(ggplot2)
-library(neuralnet)
 library(dplyr)
 library(caret)
 library(nnet)
-library(ggbeeswarm)
+library(randomForest)
 
 # Importing of Data
-setwd("C:/Users/Siah Wee Hung/Desktop/Folders/2. School/NTU/Y2S2/BC2407 Analytics II/Project")
+setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -235,11 +234,11 @@ ggplot(data = churnData, aes(x = Number.of.Dependents, fill = Number.of.Dependen
 ggplot(data = churnData, aes(x = Offer, fill = Offer)) +
   geom_bar() +
   scale_fill_manual("Offer", values = c("None" = "Red", 
-                                        "Offer A" = "Orange",
-                                        "Offer B" = "Yellow",
-                                        "Offer C" = "Green",
-                                        "Offer D" = "Blue",
-                                        "Offer E" = "Purple")) +
+                                        "Offer.A" = "Orange",
+                                        "Offer.B" = "Yellow",
+                                        "Offer.C" = "Green",
+                                        "Offer.D" = "Blue",
+                                        "Offer.E" = "Purple")) +
   labs(title = "Proportion of Offer accepted by Customers")
 
 # Phone.Service
@@ -761,6 +760,15 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
 
 
 ### Extra EDA ####################################################################################################################################
+actionable.reasons = c('Competitor had better devices', 
+                       'Product dissatisfaction', 
+                       'Limited range of services', 
+                       'Competitor made better offer',
+                       'Long distance charges',
+                       'Lack of affordable download/upload speed',
+                       'Competitor offered more data',
+                       'Price too high',
+                       'Extra data charges')
 
 df.actionable.churn = subset(churnData, Churn.Reason %in% actionable.reasons)
 nrow.actionable = nrow(df.actionable.churn)
@@ -907,25 +915,16 @@ ggplot(churnData, aes(x = factor(Number.of.Dependents.Bin, levels=c('0','1','2',
        title = "Proportion of Unlimited.Data for each Churn.Reason")
   theme_minimal()
 
-actionable.reasons = c('Competitor had better devices', 
-                       'Product dissatisfaction', 
-                       'Limited range of services', 
-                       'Competitor made better offer',
-                       'Long distance charges',
-                       'Lack of affordable download/upload speed',
-                       'Competitor offered more data',
-                       'Price too high',
-                       'Extra data charges')
+  
+  #### SAME TILL HERE
+### Machine Learning Models ########################################################################################################################
 
-
-### Neural Networks Model ########################################################################################################################
-
-# Setting the Threshold for Data Usage
+# Setting the Threshold for Avg Monthly Data Usage
 quantile(churnData$Avg.Monthly.GB.Download, probs = c(0.25, 0.50, 0.75))
 lowDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.25)
 highDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.75)
 
-# Setting the Threshold for Monthly Long Distance Charges
+# Setting the Threshold for Avg Monthly Long Distance Charges
 quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
 lowLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.25)
 highLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.75)
@@ -939,13 +938,13 @@ quantile(churnData$Total.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
 lowTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.25)
 highTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.75)
 
-# Creating a New Dependent Variable, Customer's Desired Bundle, to predict Compatibility
+# Creating a New Independent Variable, Customer's Desired Bundle
 churnData$Most.Compatible.Bundle <- NA
+# Creating 6 Mobile Bundles
 levels(churnData$Most.Compatible.Bundle) <- c("Young Adults", "Pioneer Generations", "Family Bundle", 
-                                              "Gen Z Streamers", "Frequent Fliers", "Silver Surfers",
-                                              "Average Bundle")
+                                              "Gen Z Streamers", "Frequent Fliers", "Average Bundle")
 
-## Determining their Optimal Bundle ############################################################################################################
+## Setting their Optimal Bundle ############################################################################################################
 
 # Initial Number of People without Bundle
 sum(is.na(churnData$Most.Compatible.Bundle))
@@ -965,8 +964,8 @@ churnData$Most.Compatible.Bundle[churnData$Multiple.Lines == "Yes" & churnData$N
 # Gen Z
 churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & (churnData$Streaming.Movies == "Yes" | churnData$Streaming.Music == "Yes" | churnData$Streaming.TV == "Yes")] <- "Gen Z Streamers"
 
-# Silver Surfers - Age not a Factor, no Discounts for Age
-churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Silver Surfers"
+## Silver Surfers - Age not a Factor, no Discounts for Age
+# churnData$Most.Compatible.Bundle[churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Silver Surfers"
 
 # Average Bundle - For now, if no Special Terms
 churnData$Most.Compatible.Bundle[is.na(churnData$Most.Compatible.Bundle)] <- "Average Bundle"
@@ -976,7 +975,57 @@ churnData$Most.Compatible.Bundle <- as.factor(churnData$Most.Compatible.Bundle)
 # Verify all Customers should have an Mobile Bundle that is Compatible with them!!
 sum(is.na(churnData$Most.Compatible.Bundle))
 
+## Predicting Churn ########################################################################################################################
+churnData$City <- NULL
+set.seed(123)
 
+# Train-Test Split; list = F to return a vector of indices
+trainIndex <- createDataPartition(churnData$Most.Compatible.Bundle, p = 0.7, list = FALSE)
+trainChurnData <- churnData[trainIndex, ]
+testChurnData <- churnData[-trainIndex, ]
+
+## Random Forest ####################################################################################################################
+# Fit the Random Forest Model to Predict Churn
+rfModel1 <- randomForest(Customer.Status ~ ., data = trainChurnData, importance = TRUE,
+                         ntree = 500, mtry = 2)
+
+# Identify the Churn Probability
+predict(rfModel1, newdata = testChurnData, type = "prob")[,]
+# Make Predictions and Obtain the Probability of Churning
+testChurnData$ProbChurn <- predict(rfModel1, newdata = testChurnData, type = "prob")[, 1] * 100
+
+# Verify & view the probability of churning for the first 10 customers
+head(select(testChurnData, Customer.Status, ProbChurn), 10)
+
+# Results
+summary(rfModel1)
+
+# Variable Importance of Random Forest
+rf.var.impt <- importance(rfModel1)
+rf.var.impt
+varImpPlot(rfModel1)
+## 
+
+# Evaluate Performance of Model
+confusionMatrix(rfModel1.predict, testChurnData$Customer.Status)
+rfModel1.m1.accuracy <- mean(testChurnData$Customer.Status == rfModel1.predict)
+cat("Accuracy of Random Forest (No Feature Selection)", rfModel1.m1.accuracy * 100, "%.\n")
+
+
+
+## Logistics Regression ####################################################################################################################
+# Feature Selection
+
+### Can't do Logistics Regression without feature selection as too complex
+# Fit a Logistics Regression Model
+log.m1 <- multinom(Customer.Status ~ ., data = trainChurnData)
+
+# Predicted Y Values using Log
+log.m1.pred <- predict(log.m1, newdata = testChurnData)
+
+# Evaluate the Model
+confusionMatrix(log.m1.pred, testChurnData$Customer.Status)
+mean(testChurnData$Customer.Status == log.m1.pred)
 # # Create a Copy of the Dataframe to be used with the Neural Model
 # neuralChurnData <- data.frame(churnData)
 # # Ensure is a deep copy
@@ -994,7 +1043,7 @@ trainChurnData <- scaledChurnData[trainIndex, ]
 testChurnData <- scaledChurnData[-trainIndex, ]
 
 # NN model with 10 nodes in the hidden layer, no linear output and max iterations of 1000 in training
-nnet.m1 <- nnet(Most.Compatible.Bundle ~ ., 
+nnet.m1 <- nnet(Customer.Status ~ ., 
                 data = trainChurnData, size = 10,
                 linout = FALSE, maxit = 1000)
 
