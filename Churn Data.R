@@ -20,9 +20,10 @@ churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.
 #################################################### Data Cleaning Phase ##########################################################################
 churnData$City <- factor(churnData$City)
 churnData$Number.of.Dependents <- factor(churnData$Number.of.Dependents)
+churnData$Customer.ID <- as.character(churnData$Customer.ID)
 
 # Dropping Variables that are not relevant for our analysis
-churnData$Customer.ID <- NULL
+# churnData$Customer.ID <- NULL
 churnData$Latitude <- NULL
 churnData$Longitude <- NULL
 #churnData$City <- NULL
@@ -1048,7 +1049,7 @@ youngAdultsTestChurnData <- subset(testChurnData, Assigned.Bundle == "Young Adul
 ## 1. Average Bundle RF Model
 
 # Fit the Random Forest Model to Predict Churn
-rfModelAvg <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = averageTrainChurnData, importance = TRUE,
+rfModelAvg <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = averageTrainChurnData, importance = TRUE,
                          ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelAvg, newdata = averageTestChurnData, type = "prob")[,]
@@ -1073,7 +1074,7 @@ cat("Accuracy of Random Forest (No Feature Selection)", rfModelAvg.accuracy * 10
 ## 2. Family Bundle
 
 # Fit the Random Forest Model to Predict Churn
-rfModelFamily <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = familyTrainChurnData, importance = TRUE,
+rfModelFamily <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = familyTrainChurnData, importance = TRUE,
                            ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelFamily, newdata = familyTestChurnData, type = "prob")[,]
@@ -1098,7 +1099,7 @@ cat("Accuracy of Random Forest (No Feature Selection)", rfModelFamily.accuracy *
 ## 3. Frequent Fliers
 
 # Fit the Random Forest Model to Predict Churn
-rfModelFliers <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = fliersTrainChurnData, importance = TRUE,
+rfModelFliers <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = fliersTrainChurnData, importance = TRUE,
                               ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelFliers, newdata = fliersTestChurnData, type = "prob")[,]
@@ -1124,7 +1125,7 @@ cat("Accuracy of Random Forest (No Feature Selection)", rfModelFliers.accuracy *
 ## 4. Gen Z Streamers
 
 # Fit the Random Forest Model to Predict Churn
-rfModelGenZ <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = genZTrainChurnData, importance = TRUE,
+rfModelGenZ <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = genZTrainChurnData, importance = TRUE,
                               ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelGenZ, newdata = genZTestChurnData, type = "prob")[,]
@@ -1150,7 +1151,7 @@ cat("Accuracy of Random Forest (No Feature Selection)", rfModelGenZ.accuracy * 1
 ## 5. Pioneer Generation
 
 # Fit the Random Forest Model to Predict Churn
-rfModelPioneer <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = pioneerTrainChurnData, importance = TRUE,
+rfModelPioneer <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = pioneerTrainChurnData, importance = TRUE,
                             ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelPioneer, newdata = pioneerTestChurnData, type = "prob")[,]
@@ -1176,7 +1177,7 @@ cat("Accuracy of Random Forest (No Feature Selection)", rfModelPioneer.accuracy 
 ## 6. Young Adults
 
 # Fit the Random Forest Model to Predict Churn
-rfModelYoungAdults <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason, data = youngAdultsTrainChurnData, importance = TRUE,
+rfModelYoungAdults <- randomForest(Churn ~ . - Customer.Status - Churn.Category - Churn.Reason - Customer.ID, data = youngAdultsTrainChurnData, importance = TRUE,
                                ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelYoungAdults, newdata = youngAdultsTestChurnData, type = "prob")[,]
@@ -1310,9 +1311,12 @@ minCol <- apply(subsettedCombinedChurnOnly, 1, function(x) {
 })
 # Add Recommendation to Table
 subsettedCombinedChurnOnly$Recommended_Bundle <- minCol
-# Append the columns together into a new table
-accuracyRFTable2 <- rbind(Accuracy = modelAccuracy2, subsettedCombinedChurnOnly)
-accuracyRFTable2$Recommended_Bundle[1] <- NA
+subsettedCombinedChurnOnly
+## Append the columns together into a new table
+accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$Customer.ID, subsettedCombinedChurnOnly)
+# Verify Correct Customer ID
+nrow(accuracyRFTable2)
+nrow(subsettedCombinedChurnOnly)
 accuracyRFTable2
 
 ## Logistics Regression ####################################################################################################################
