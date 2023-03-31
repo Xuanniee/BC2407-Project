@@ -7,10 +7,9 @@ library(dplyr)
 library(caret)
 library(nnet)
 library(randomForest)
-library(smotefamily)
 
 # Importing of Data
-setwd("C:/Users/Siah Wee Hung/Desktop/BC2407-Project")
+setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -19,14 +18,14 @@ churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.
 # 3. City ~ Char instead of Factor
 
 #################################################### Data Cleaning Phase ##########################################################################
-#churnData$City <- factor(churnData$City)
+churnData$City <- factor(churnData$City)
 churnData$Number.of.Dependents <- factor(churnData$Number.of.Dependents)
 
 # Dropping Variables that are not relevant for our analysis
 churnData$Customer.ID <- NULL
 churnData$Latitude <- NULL
 churnData$Longitude <- NULL
-churnData$City <- NULL
+#churnData$City <- NULL
 churnData$Zip.Code <- NULL
 
 ## Convert all Whitespaces into NA
@@ -762,8 +761,6 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
 
 
 ### Extra EDA ####################################################################################################################################
-
-# create subset of dataset where churn reason is something that can be addressed by offering optimal bundles
 actionable.reasons = c('Competitor had better devices', 
                        'Product dissatisfaction', 
                        'Limited range of services', 
@@ -776,13 +773,10 @@ actionable.reasons = c('Competitor had better devices',
 
 df.actionable.churn = subset(churnData, Churn.Reason %in% actionable.reasons)
 nrow.actionable = nrow(df.actionable.churn)
-
-# downsample such that number of churn matches number of joined / stayed
 df.stayed.downsample = sample_n(subset(churnData, Churn.Reason=='Staying Customer'), nrow.actionable)
 df.combine = rbind(df.actionable.churn, df.stayed.downsample)
 nrow(df.combine)
 
-# remove redundant columns, and change Customer.Status to binary. 1 = churned, 2 = not churned
 set.seed(123)
 df.combine$Y <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
 df.combine$Count <- NULL
@@ -796,17 +790,14 @@ df.combine$Number.of.Referrals <- NULL
 df.combine$Offer <- NULL
 df.combine$Payment.Method <- NULL
 df.combine$Paperless.Billing <- NULL
-df.combine$City <- NULL
+#df.combine$City <- NULL
+df.combine$Service.Count <- as.numeric(df.combine$Service.Count)
 str(df.combine)
 
-# train a logistic regression model on the subset of data. No need train test split since we just want to find variable importance
 model <- glm(Y ~ ., data=df.combine, family='binomial')
 options(max.print=5000)
 summary(model)
 
-
-# relationship between unlimited data and churn reasons related to data ['competitor made better offer', 'competitor offered more data', 'extra data charges']
-churnData$Count <- rep(1, nrow(churnData))
 
 ggplot(subset(churnData, Churn.Reason %in% c('Staying Customer', 'New Customer', 'Competitor made better offer', 'Extra data charges', 'Competitor offered more data')), aes(x=Churn.Reason, y=Count, fill=Unlimited.Data)) +
   geom_bar(position = "fill",stat = "identity") +
@@ -814,7 +805,6 @@ ggplot(subset(churnData, Churn.Reason %in% c('Staying Customer', 'New Customer',
        y = "Proportion",
        title = "Proportion of Unlimited.Data for each Churn.Reason")
 
-# relationship between tenure and customer status
 ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
   geom_violin() +
   geom_boxplot(width = 0.1,
@@ -827,7 +817,6 @@ ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, 
        title = "Relationship between Tenure.in.Months & Customer.Status")
 
 
-# distribution of usage charge ratio for customers that churned because of "price too high" and customers that didn't churn / churned for other reasons (histogram)
 churnData$Usage.Charge.Ratio <- pmax(churnData$Monthly.Charge / churnData$Avg.Monthly.GB.Download, rep(0, nrow(churnData)))
 churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Price too high', 'Price too high', 'Not Churned / Other reasons'))
 
@@ -845,19 +834,6 @@ ggplot(churnData, aes(x=log(1+Usage.Charge.Ratio), fill=Customer.Status.Temp)) +
        y = "Proportion",
        title = "Relationship between Usage.Charge.Ratio & Customer.Status")
 
-# distribution of usage charge ratio for customers that churned because of "price too high" and customers that didn't churn / churned for other reasons (boxplot)
-# graph too right skewed, need log transformation
-ggplot(churnData, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Customer.Status)) +
-  geom_violin() +
-  geom_boxplot(width = 0.5,
-               fill = "Orange",
-               outlier.colour = "Orange",
-               outlier.size = 1.5) +
-  labs(x = "Customer.Status",
-       y = "Usage.Charge.Ratio",
-       title = "Relationship between Usage.Charge.Ratio & Customer.Status")
-
-
 ggplot(churnData, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill = Customer.Status.Temp)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
@@ -869,7 +845,19 @@ ggplot(churnData, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill 
        y = "Usage.Charge.Ratio",
        title = "Relationship between Usage.Charge.Ratio & Customer.Status")
 
-# distribution of monthly data usage for customers that churned because "competitor offered more data" and customers that didn't churn / churned for other reasons
+
+
+ggplot(churnData, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Customer.Status)) +
+  geom_violin() +
+  geom_boxplot(width = 0.5,
+               fill = "Orange",
+               outlier.colour = "Orange",
+               outlier.size = 1.5) +
+  labs(x = "Customer.Status",
+       y = "Usage.Charge.Ratio",
+       title = "Relationship between Usage.Charge.Ratio & Customer.Status")
+
+
 churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Competitor offered more data', 'Competitor offered more data', 'Not Churned / Other reasons'))
 
 ggplot(churnData, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fill = Customer.Status.Temp)) +
@@ -884,12 +872,10 @@ ggplot(churnData, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fil
        title = "Relationship between Avg.Monthly.GB.Download & Customer.Status")
 
 
-# Proportion of churn for each of the different service count categories 
 churnData$Customer.Status.Temp <- factor(ifelse(churnData$Customer.Status=='Churned', 'Churned', 'Not Churned'))
 
-# make a new col Service.Count which is just the number of services the customer has subscribed to
 churnData$Service.Count = factor(
-    ifelse(churnData$Streaming.Music=='Yes', 1, 0) + 
+  ifelse(churnData$Streaming.Music=='Yes', 1, 0) + 
     ifelse(churnData$Streaming.Movies=='Yes', 1, 0) +
     ifelse(churnData$Streaming.TV=='Yes', 1, 0) +
     ifelse(churnData$Premium.Tech.Support=='Yes', 1, 0) +
@@ -898,15 +884,17 @@ churnData$Service.Count = factor(
     ifelse(churnData$Online.Security=='Yes', 1, 0)
 )
 
-ggplot(churnData, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
-  geom_bar(stat = "identity", position="fill")
 
-# relationship between age and Avg.Monthly.GB.Download for customers that churned and those that did not churn
+churnData$Count <- rep(1, nrow(churnData))
+
+ggplot(churnData, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
+  geom_bar(stat = "identity")
+
+
 ggplot(churnData, aes(x = Age, y = Avg.Monthly.GB.Download)) +
-  geom_jitter(aes(color=Customer.Status.Temp), width=0.1, alpha=0.5) +
+  geom_jitter(aes(color=Customer.Status.Temp), width=0.1, alpha=0.5) + 
   scale_color_manual(values=c('Churned'='#F9766E', 'Not Churned'='#00BFC4'))
 
-# distribution of Avg.Monthly.GB.Download for customers of Age<30 that churned and those that did not churn
 ggplot(subset(churnData, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Status.Temp, fill=Customer.Status.Temp)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
@@ -995,12 +983,12 @@ levels(churnData$Churn.Reason)
 
 # Better Offer - Should add 311 to YA
 sum(churnData$Assigned.Bundle == "Young Adults")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor made better offer"] <- "Young Adults"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor made better offer" & churnData$Churn == "Churned"] <- "Young Adults"
 sum(churnData$Assigned.Bundle == "Young Adults")
 
 # Higher Download Speeds - should add 100 to Family [added 99 instead]
 sum(churnData$Assigned.Bundle == "Family Bundle")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered higher download speeds"] <- "Family Bundle"
+churnData$Assigned.Bundle[churnData$Churn.Reason == "Competitor offered higher download speeds" & churnData$Churn == "Churned"] <- "Family Bundle"
 sum(churnData$Assigned.Bundle == "Family Bundle")
 
 # Competitors offered more Data - Should add 117 to Average {Added less}
@@ -1651,138 +1639,3 @@ ggplot(competitorChurnData, aes(x = Churn.Reason, fill = Customer.Status)) +
 
 
 
-
-# +------------------------------------------------------------------+
-# |  Method 2: Random allocate non-optimal bundle for churned users  |
-# +------------------------------------------------------------------+
-
-df <- churnData
-
-# stayed / joined -> 0, churned -> 1. Churn is our label.
-df$Churn <- ifelse(df$Customer.Status=='Churned', 1, 0) 
-
-# prevent look-ahead bias
-df$Customer.Status <- NULL   
-df$Churn.Category  <- NULL    
-df$Churn.Reason    <- NULL   
-
-# irrelevant
-df$Offer               <- NULL  
-df$Payment.Method      <- NULL    
-df$Paperless.Billing   <- NULL
-df$Number.of.Referrals <- NULL
-
-# 2-factor to binary
-df$Male                 <- ifelse(df$Gender=='Male', 1, 0) # change from "Gender" to "Male" for better readibility
-df$Gender               <- NULL # drop "Gender" since we have new column "Male"
-df$Married              <- ifelse(df$Married=='Yes', 1, 0)
-df$Streaming.Movies     <- ifelse(df$Streaming.Movies=='Yes', 1, 0)
-df$Streaming.Music      <- ifelse(df$Streaming.Music=='Yes', 1, 0)
-df$Streaming.TV         <- ifelse(df$Streaming.TV=='Yes', 1, 0)
-df$Unlimited.Data       <- ifelse(df$Unlimited.Data=='Yes', 1, 0)
-df$Premium.Tech.Support <- ifelse(df$Premium.Tech.Support=='Yes', 1, 0)
-df$Internet.Service     <- ifelse(df$Internet.Service=='Yes', 1, 0)
-df$Multiple.Lines       <- ifelse(df$Multiple.Lines=='Yes', 1, 0)
-df$Phone.Service        <- ifelse(df$Phone.Service=='Yes', 1, 0)
-
-str(df)
-
-# Prerequisite of SMOTE is a numeric dataset, so categorical must be converted to numbers. 
-# This can be done via one-hot encoding
-bundles <- df$Assigned.Bundle # store the Assigned.Bundle column first before removing it from the dataframe to be over sampled
-df.no.bundle <- df[, !names(df) %in% c('Assigned.Bundle')] # dataframe w/o Assigned.Bundle column so that the Assigned.Bundle column does not get encoded
-
-# one-hot encoding
-dummy <- dummyVars(" ~ .", data=df.no.y)
-df <- as.data.frame(predict(dummy, newdata=df.no.bundle))
-df$Assigned.Bundle <- bundles # insert Assigned.Bundle back into df after one-hot encoding
-
-# subset dataset by Assigned.Bundle
-df.average <- subset(df, Assigned.Bundle=='Average Bundle')
-df.family  <- subset(df, Assigned.Bundle=='Family Bundle')
-df.fliers  <- subset(df, Assigned.Bundle=='Frequent Fliers')
-df.genz    <- subset(df, Assigned.Bundle=='Gen Z Streamers')
-df.pioneer <- subset(df, Assigned.Bundle=='Pioneer Generation')
-df.adults  <- subset(df, Assigned.Bundle=='Young Adults')
-
-# over-sample using SMOTE
-df.smote.average <- SMOTE(X=df.average[, !names(df.average) %in% c('Assigned.Bundle')], target=df.average$Churn)$data
-df.smote.family  <- SMOTE(X=df.family[, !names(df.family) %in% c('Assigned.Bundle')], target=df.family$Churn)$data
-df.smote.fliers  <- SMOTE(X=df.fliers[, !names(df.fliers) %in% c('Assigned.Bundle')], target=df.fliers$Churn)$data
-df.smote.genz    <- SMOTE(X=df.genz[, !names(df.genz) %in% c('Assigned.Bundle')], target=df.genz$Churn)$data
-df.smote.pioneer <- SMOTE(X=df.pioneer[, !names(df.pioneer) %in% c('Assigned.Bundle')], target=df.pioneer$Churn)$data
-df.smote.adults  <- SMOTE(X=df.adults[, !names(df.adults) %in% c('Assigned.Bundle')], target=df.adults$Churn)$data
-
-# remove automatically-generated column "class" from SMOTE-ing
-df.smote.average$class <- NULL
-df.smote.family$class  <- NULL
-df.smote.fliers$class  <- NULL
-df.smote.genz$class    <- NULL
-df.smote.pioneer$class <- NULL
-df.smote.adults$class  <- NULL
-
-# train-test split
-train.size = 0.8
-train.idx.average <- createDataPartition(df.smote.average$Churn, p = train.size, list = FALSE)
-train.idx.family  <- createDataPartition(df.smote.family$Churn,  p = train.size, list = FALSE)
-train.idx.fliers  <- createDataPartition(df.smote.fliers$Churn,  p = train.size, list = FALSE)
-train.idx.genz    <- createDataPartition(df.smote.genz$Churn,    p = train.size, list = FALSE)
-train.idx.pioneer <- createDataPartition(df.smote.pioneer$Churn, p = train.size, list = FALSE)
-train.idx.adults  <- createDataPartition(df.smote.adults$Churn,  p = train.size, list = FALSE)
-
-train.average = df.smote.average[train.idx.average,]
-test.average  = df.smote.average[-train.idx.average,]
-model.average <- glm(Churn ~ ., family='binomial', data=train.average)
-
-train.family  = df.smote.family[train.idx.family,]
-test.family   = df.smote.family[-train.idx.family,]
-model.family  <- glm(Churn ~ ., family='binomial', data=train.family)
-
-train.fliers  = df.smote.fliers[train.idx.fliers,]
-test.fliers   = df.smote.fliers[-train.idx.fliers,]
-model.fliers  <- glm(Churn ~ ., family='binomial', data=train.fliers)
-
-train.genz    = df.smote.genz[train.idx.genz,]
-test.genz     = df.smote.genz[-train.idx.genz,]
-model.genz    <- glm(Churn ~ ., family='binomial', data=train.genz)
-
-train.pioneer = df.smote.pioneer[train.idx.pioneer,]
-test.pioneer  = df.smote.pioneer[-train.idx.pioneer,]
-model.pioneer <- glm(Churn ~ ., family='binomial', data=train.pioneer)
-
-train.adults  = df.smote.adults[train.idx.adults,]
-test.adults   = df.smote.adults[-train.idx.adults,]
-model.adults  <- glm(Churn ~ ., family='binomial', data=train.adults)
-
-
-# Model evaluation
-threshold  <- 0.5
-nrows      <- c(nrow(df.average), nrow(df.family), nrow(df.fliers), nrow(df.genz), nrow(df.pioneer), nrow(df.adults))
-models     <- c('Average Bundle', 'Family Bundle', 'Frequent Fliers', 'Gen Z Streamers', 'Pioneer', 'Young Adults')
-accuracies <- rep(0, 6)
-
-preds <- predict(model.average, test.average, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[1] <- sum(preds==test.average$Churn) / nrow(test.average) # accuracy
-
-preds <- predict(model.family, test.family, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[2] <- sum(preds==test.family$Churn) / nrow(test.family) # accuracy
-
-preds <- predict(model.fliers, test.fliers, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[3] <- sum(preds==test.fliers$Churn) / nrow(test.fliers) # accuracy
-
-preds <- predict(model.genz, test.genz, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[4] <- sum(preds==test.genz$Churn) / nrow(test.genz) # accuracy
-
-preds <- predict(model.pioneer, test.pioneer, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[5] <- sum(preds==test.pioneer$Churn) / nrow(test.pioneer) # accuracy
-
-preds <- predict(model.adults, test.adults, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[6] <- sum(preds==test.adults$Churn) / nrow(test.adults) # accuracy
-
-data.table(models, accuracies, nrows)
