@@ -1436,6 +1436,9 @@ nrow(accuracyRFTable2)
 nrow(subsettedCombinedChurnOnly)
 accuracyRFTable2
 
+# Export to CSV
+write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = TRUE)
+
 ## Logistics Regression ####################################################################################################################
 model.average <- glm(Churn ~ ., family='binomial', data=averageTrainChurnData)
 
