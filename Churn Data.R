@@ -1043,6 +1043,7 @@ churnData2$Churn <- ifelse(churnData2$Customer.Status=='Churned', 1, 0)
 churnData2$Customer.Status <- NULL
 churnData2$Churn.Category  <- NULL
 churnData2$Churn.Reason    <- NULL
+customerID <- churnData2$Customer.ID
 churnData2$Customer.ID <- NULL
 
 # irrelevant
@@ -1074,6 +1075,7 @@ churnData2 <- as.data.frame(predict(dummy, newdata=churnData2.no.bundle))
 churnData2$Assigned.Bundle <- bundles # insert Assigned.Bundle back into churnData2 after one-hot encoding
 
 names(churnData2) <- make.names(names(churnData2))
+churnData2 <- cbind(customerID, churnData2)
 
 # Train-Test Split; list = F to return a vector of indices
 trainIndex <- createDataPartition(churnData2$Assigned.Bundle, p = 0.7, list = FALSE)
@@ -1090,6 +1092,19 @@ trainChurnData.genz    <- subset(trainChurnData, Assigned.Bundle=='Gen Z Streame
 trainChurnData.pioneer <- subset(trainChurnData, Assigned.Bundle=='Pioneer Generation')
 trainChurnData.adults  <- subset(trainChurnData, Assigned.Bundle=='Young Adults')
 
+avgCustomerID <- trainChurnData.average$customerID
+familyCustomerID <- trainChurnData.family$customerID
+fliersCustomerID <- trainChurnData.fliers$customerID
+genzCustomerID <- trainChurnData.genz$customerID
+pioneerCustomerID <- trainChurnData.pioneer$customerID
+youngAdultsCustomerID <- trainChurnData.adults$customerID
+trainChurnData.average$customerID <- NULL
+trainChurnData.family$customerID <- NULL
+trainChurnData.fliers$customerID <- NULL
+trainChurnData.genz$customerID <- NULL
+trainChurnData.pioneer$customerID <- NULL
+trainChurnData.adults$customerID <- NULL
+
 # over-sample using SMOTE
 trainChurnData.smote.average <- SMOTE(X=trainChurnData.average[, !names(trainChurnData.average) %in% c('Assigned.Bundle')], target=trainChurnData.average$Churn)$data
 trainChurnData.smote.family  <- SMOTE(X=trainChurnData.family[, !names(trainChurnData.family) %in% c('Assigned.Bundle')], target=trainChurnData.family$Churn)$data
@@ -1105,6 +1120,13 @@ trainChurnData.smote.fliers$class  <- NULL
 trainChurnData.smote.genz$class    <- NULL
 trainChurnData.smote.pioneer$class <- NULL
 trainChurnData.smote.adults$class  <- NULL
+
+# trainChurnData.smote.average <- cbind(avgCustomerID, trainChurnData.smote.average)
+# trainChurnData.smote.family <- cbind(familyCustomerID, trainChurnData.smote.family)
+# trainChurnData.smote.fliers <- cbind(fliersCustomerID, trainChurnData.smote.fliers)
+# trainChurnData.smote.genz <- cbind(genzCustomerID, trainChurnData.smote.genz)
+# trainChurnData.smote.pioneer <- cbind(pioneerCustomerID, trainChurnData.smote.pioneer)
+# trainChurnData.smote.adults <- cbind(youngAdultsCustomerID, trainChurnData.smote.adults)
 
 # Subset 6 Datasets for 6 Mobile Plans
 ## Subsetting Train Dataset
@@ -1408,11 +1430,11 @@ minCol <- apply(subsettedCombinedChurnOnly, 1, function(x) {
 subsettedCombinedChurnOnly$Recommended_Bundle <- minCol
 subsettedCombinedChurnOnly
 ## Append the columns together into a new table
-# accuracyRFTable2 <- cbind(CustomerID = churnData$Customer.ID[-trainIndex], subsettedCombinedChurnOnly)
-# # Verify Correct Customer ID
-# nrow(accuracyRFTable2)
-# nrow(subsettedCombinedChurnOnly)
-# accuracyRFTable2
+accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$customerID, subsettedCombinedChurnOnly)
+# Verify Correct Customer ID
+nrow(accuracyRFTable2)
+nrow(subsettedCombinedChurnOnly)
+accuracyRFTable2
 
 ## Logistics Regression ####################################################################################################################
 model.average <- glm(Churn ~ ., family='binomial', data=averageTrainChurnData)
