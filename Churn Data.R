@@ -8,9 +8,11 @@ library(caret)
 library(nnet)
 library(randomForest)
 library(smotefamily)
+library(car)
+library(glmnet)
 
 # Importing of Data
-setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
+setwd("C:/Users/Siah Wee Hung/Desktop/BC2407-Project")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -1440,17 +1442,23 @@ accuracyRFTable2
 write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = TRUE)
 
 ## Logistics Regression ####################################################################################################################
-model.average <- glm(Churn ~ ., family='binomial', data=averageTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(averageTrainChurnData[, !names(averageTrainChurnData) %in% c('Churn')]),  y=averageTrainChurnData$Churn, family='binomial', alpha=1)
+model.average <- glmnet(x=averageTrainChurnData[, !names(averageTrainChurnData) %in% c('Churn')],  y=averageTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
-model.family  <- glm(Churn ~ ., family='binomial', data=familyTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(familyTrainChurnData[, !names(familyTrainChurnData) %in% c('Churn')]),  y=familyTrainChurnData$Churn, family='binomial', alpha=1)
+model.family <- glmnet(x=familyTrainChurnData[, !names(familyTrainChurnData) %in% c('Churn')],  y=familyTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
-model.fliers  <- glm(Churn ~ ., family='binomial', data=fliersTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(fliersTrainChurnData[, !names(fliersTrainChurnData) %in% c('Churn')]),  y=fliersTrainChurnData$Churn, family='binomial', alpha=1)
+model.fliers    <- glmnet(x=fliersTrainChurnData[, !names(fliersTrainChurnData) %in% c('Churn')],  y=fliersTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
-model.genz    <- glm(Churn ~ ., family='binomial', data=genZTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(genZTrainChurnData[, !names(genZTrainChurnData) %in% c('Churn')]),  y=genZTrainChurnData$Churn, family='binomial', alpha=1)
+model.genz    <- glmnet(x=genZTrainChurnData[, !names(genZTrainChurnData) %in% c('Churn')],  y=genZTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
-model.pioneer <- glm(Churn ~ ., family='binomial', data=pioneerTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(pioneerTrainChurnData[, !names(pioneerTrainChurnData) %in% c('Churn')]),  y=pioneerTrainChurnData$Churn, family='binomial', alpha=1)
+model.pioneer    <- glmnet(x=pioneerTrainChurnData[, !names(pioneerTrainChurnData) %in% c('Churn')],  y=pioneerTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
-model.adults  <- glm(Churn ~ ., family='binomial', data=youngAdultsTrainChurnData)
+cv <- cv.glmnet(x=as.matrix(youngAdultsTrainChurnData[, !names(youngAdultsTrainChurnData) %in% c('Churn')]),  y=youngAdultsTrainChurnData$Churn, family='binomial', alpha=1)
+model.adults    <- glmnet(x=youngAdultsTrainChurnData[, !names(youngAdultsTrainChurnData) %in% c('Churn')],  y=youngAdultsTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
 
 
 # Model evaluation
@@ -1459,30 +1467,95 @@ threshold  <- 0.5
 models     <- c('Average Bundle', 'Family Bundle', 'Frequent Fliers', 'Gen Z Streamers', 'Pioneer', 'Young Adults')
 accuracies <- rep(0, 6)
 
-preds <- predict(model.average, averageTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[1] <- sum(preds==averageTestChurnData$Churn) / nrow(averageTestChurnData) # accuracy
 
-preds <- predict(model.family, familyTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[2] <- sum(preds==familyTestChurnData$Churn) / nrow(familyTestChurnData) # accuracy
+averageTestChurnData$Assigned.Bundle <- NULL
+familyTestChurnData$Assigned.Bundle <- NULL
+fliersTestChurnData$Assigned.Bundle <- NULL
+genZTestChurnData$Assigned.Bundle <- NULL
+pioneerTestChurnData$Assigned.Bundle <- NULL
+youngAdultsTestChurnData$Assigned.Bundle <- NULL
 
-preds <- predict(model.fliers, fliersTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[3] <- sum(preds==fliersTestChurnData$Churn) / nrow(fliersTestChurnData) # accuracy
+averageTestChurnData$ProbChurn <- predict(model.average, newx=as.matrix(averageTestChurnData[, !names(averageTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+familyTestChurnData$ProbChurn <- predict(model.family, newx=as.matrix(familyTestChurnData[, !names(familyTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+fliersTestChurnData$ProbChurn <- predict(model.fliers, newx=as.matrix(fliersTestChurnData[, !names(fliersTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+genZTestChurnData$ProbChurn <- predict(model.genz, newx=as.matrix(genZTestChurnData[, !names(genZTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+pioneerTestChurnData$ProbChurn <- predict(model.pioneer, newx=as.matrix(pioneerTestChurnData[, !names(pioneerTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+youngAdultsTestChurnData$ProbChurn <- predict(model.adults, newx=as.matrix(youngAdultsTestChurnData[, !names(youngAdultsTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
 
-preds <- predict(model.genz, genZTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[4] <- sum(preds==genZTestChurnData$Churn) / nrow(genZTestChurnData) # accuracy
+churnAvg <- averageTestChurnData[averageTestChurnData$ProbChurn > .8, ]
+churnFamily <- familyTestChurnData[familyTestChurnData$ProbChurn > .8, ]
+churnFliers <- fliersTestChurnData[fliersTestChurnData$ProbChurn > .8, ]
+churnGenZ <- genZTestChurnData[genZTestChurnData$ProbChurn > .8, ]
+churnPioneer <- pioneerTestChurnData[pioneerTestChurnData$ProbChurn > .8, ]
+churnYoungAdults <- youngAdultsTestChurnData[youngAdultsTestChurnData$ProbChurn > .8, ]
+# Combine the Subsets into 1 Dataset
+combinedChurnOnly <- rbind(churnAvg, churnFamily, churnFliers, churnGenZ, churnPioneer, churnYoungAdults)
 
-preds <- predict(model.pioneer, pioneerTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[5] <- sum(preds==pioneerTestChurnData$Churn) / nrow(pioneerTestChurnData) # accuracy
 
-preds <- predict(model.adults, youngAdultsTestChurnData, type='response')
+averageTestChurnData$ProbChurn <- NULL
+familyTestChurnData$ProbChurn <- NULL
+fliersTestChurnData$ProbChurn <- NULL
+genZTestChurnData$ProbChurn <- NULL
+pioneerTestChurnData$ProbChurn <- NULL
+youngAdultsTestChurnData$ProbChurn <- NULL
+
+averageTestChurnData$customerID <- NULL
+familyTestChurnData$customerID <- NULL
+fliersTestChurnData$customerID <- NULL
+genZTestChurnData$customerID <- NULL
+pioneerTestChurnData$customerID <- NULL
+youngAdultsTestChurnData$customerID <- NULL
+
+
+# preds <- predict(model.average, newx=as.matrix(averageTestChurnData[, !names(averageTestChurnData) %in% c('Churn')]), type='response', s=0.1)
+# preds <- ifelse(preds < threshold, 0, 1)
+# accuracies[1] <- mean(preds==averageTestChurnData$Churn) # accuracy
+# confusionMatrix(data=factor(as.vector(preds)), reference=factor(averageTestChurnData$Churn))$table
+
+preds <- predict(model.average, newx=as.matrix(averageTestChurnData[, !names(averageTestChurnData) %in% c('Churn')]), type='response')
 preds <- ifelse(preds < threshold, 0, 1)
-accuracies[6] <- sum(preds==youngAdultsTestChurnData$Churn) / nrow(youngAdultsTestChurnData) # accuracy
+accuracies[1] <- mean(preds==averageTestChurnData$Churn) # accuracy
+
+preds <- predict(model.family, newx=as.matrix(familyTestChurnData[, !names(familyTestChurnData) %in% c('Churn')]), type='response')
+preds <- ifelse(preds < threshold, 0, 1)
+accuracies[2] <- mean(preds==familyTestChurnData$Churn) # accuracy
+
+preds <- predict(model.fliers, newx=as.matrix(fliersTestChurnData[, !names(fliersTestChurnData) %in% c('Churn')]), type='response')
+preds <- ifelse(preds < threshold, 0, 1)
+accuracies[3] <- mean(preds==fliersTestChurnData$Churn) # accuracy
+
+preds <- predict(model.genz, newx=as.matrix(genZTestChurnData[, !names(genZTestChurnData) %in% c('Churn')]), type='response')
+preds <- ifelse(preds < threshold, 0, 1)
+accuracies[4] <- mean(preds==genZTestChurnData$Churn) # accuracy
+
+preds <- predict(model.pioneer, newx=as.matrix(pioneerTestChurnData[, !names(pioneerTestChurnData) %in% c('Churn')]), type='response')
+preds <- ifelse(preds < threshold, 0, 1)
+accuracies[5] <- mean(preds==pioneerTestChurnData$Churn) # accuracy
+
+preds <- predict(model.adults, newx=as.matrix(youngAdultsTestChurnData[, !names(youngAdultsTestChurnData) %in% c('Churn')]), type='response')
+preds <- ifelse(preds < threshold, 0, 1)
+accuracies[6] <- mean(preds==youngAdultsTestChurnData$Churn) # accuracy
 
 # data.table(models, accuracies, nrows)
 data.table(models, accuracies)
+
+combined.matrix <- as.matrix(combinedChurnOnly[, !names(combinedChurnOnly) %in% c('customerID', 'Churn', 'ProbChurn')])
+
+combinedChurnOnly$average <- predict(model.average, newx=combined.matrix, type='response')
+combinedChurnOnly$family <- predict(model.family, newx=combined.matrix, type='response')
+combinedChurnOnly$fliers <- predict(model.fliers, newx=combined.matrix, type='response')
+combinedChurnOnly$genz <- predict(model.genz, newx=combined.matrix, type='response')
+combinedChurnOnly$pioneer <- predict(model.pioneer, newx=combined.matrix, type='response')
+combinedChurnOnly$adults <- predict(model.adults, newx=combined.matrix, type='response')
+
+
+combinedChurnOnlyProbs <- combinedChurnOnly[, c('average', 'family', 'fliers', 'genz', 'pioneer', 'adults')]
+combinedChurnOnlyProbs$recomm <- apply(combinedChurnOnlyProbs, 1, function(x) {
+  names(combinedChurnOnlyProbs)[which.min(x)]
+})
+combinedChurnOnlyFinal <- cbind(combinedChurnOnly[, c('customerID', 'ProbChurn')], combinedChurnOnlyProbs)
+
+
+View(combinedChurnOnlyFinal)
+table(combinedChurnOnlyFinal$recomm)
 
