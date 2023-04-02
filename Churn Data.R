@@ -1070,7 +1070,7 @@ table(churnData$Assigned.Bundle)
 # ||===========================================||
 
 # Final data pre-processing
-set.seed(123)
+set.seed(4)
 
 churnData2 <- churnData
 
@@ -1342,27 +1342,28 @@ rfModelYoungAdults.accuracy <- mean(youngAdultsTestChurnData$Churn == rfModelYou
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelYoungAdults.accuracy * 100, "%.\n")
 
 # Determine the Number of People whose Churn Probs > 80%
-rfModelAvg.numChurn <- length(averageTestChurnData$ProbChurn[averageTestChurnData$ProbChurn > 80])
+churnThreshold   <- 80
+rfModelAvg.numChurn <- length(averageTestChurnData$ProbChurn[averageTestChurnData$ProbChurn > churnThreshold])
 rfModelAvg.size <- nrow(averageTestChurnData)
 rfModelAvg.percentageChurn <- (rfModelAvg.numChurn/rfModelAvg.size) * 100
 
-rfModelFamily.numChurn <- length(familyTestChurnData$ProbChurn[familyTestChurnData$ProbChurn > 80])
+rfModelFamily.numChurn <- length(familyTestChurnData$ProbChurn[familyTestChurnData$ProbChurn > churnThreshold])
 rfModelFamily.size <- nrow(familyTestChurnData)
 rfModelFamily.percentageChurn <- (rfModelFamily.numChurn/rfModelFamily.size) * 100
 
-rfModelFliers.numChurn <- length(fliersTestChurnData$ProbChurn[fliersTestChurnData$ProbChurn > 80])
+rfModelFliers.numChurn <- length(fliersTestChurnData$ProbChurn[fliersTestChurnData$ProbChurn > churnThreshold])
 rfModelFliers.size <- nrow(fliersTestChurnData)
 rfModelFliers.percentageChurn <- (rfModelFliers.numChurn/rfModelFliers.size) * 100
 
-rfModelGenZ.numChurn <- length(genZTestChurnData$ProbChurn[genZTestChurnData$ProbChurn > 80])
+rfModelGenZ.numChurn <- length(genZTestChurnData$ProbChurn[genZTestChurnData$ProbChurn > churnThreshold])
 rfModelGenZ.size <- nrow(genZTestChurnData)
 rfModelGenZ.percentageChurn <- (rfModelGenZ.numChurn/rfModelGenZ.size) * 100
 
-rfModelPioneer.numChurn <- length(pioneerTestChurnData$ProbChurn[pioneerTestChurnData$ProbChurn > 80])
+rfModelPioneer.numChurn <- length(pioneerTestChurnData$ProbChurn[pioneerTestChurnData$ProbChurn > churnThreshold])
 rfModelPioneer.size <- nrow(pioneerTestChurnData)
 rfModelPioneer.percentageChurn <- (rfModelPioneer.numChurn/rfModelPioneer.size) * 100
 
-rfModelYoungAdults.numChurn <- length(youngAdultsTestChurnData$ProbChurn[youngAdultsTestChurnData$ProbChurn > 80])
+rfModelYoungAdults.numChurn <- length(youngAdultsTestChurnData$ProbChurn[youngAdultsTestChurnData$ProbChurn > churnThreshold])
 rfModelYoungAdults.size <- nrow(unique(youngAdultsTestChurnData))
 rfModelYoungAdults.percentageChurn <- (rfModelYoungAdults.numChurn/rfModelYoungAdults.size) * 100
 
@@ -1377,7 +1378,6 @@ accuracyRFTable <- data.frame(Model = modelNames, Accuracy = modelAccuracies, Ch
 accuracyRFTable
 
 # Subset the People who churned from all the 6 Test Datasets
-churnThreshold   <- 80
 churnAvg         <- averageTestChurnData[averageTestChurnData$ProbChurn         > churnThreshold, ]
 churnFamily      <- familyTestChurnData[familyTestChurnData$ProbChurn           > churnThreshold, ]
 churnFliers      <- fliersTestChurnData[fliersTestChurnData$ProbChurn           > churnThreshold, ]
@@ -1462,25 +1462,41 @@ rfModelYoungAdults.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelYoungAdul
 cat("Accuracy: ", rfModelYoungAdults.accuracy2 * 100, "%.\n")
 
 modelAccuracy2 <- c(rfModelAvg.accuracy2, rfModelFamily.accuracy2, rfModelFliers.accuracy2, rfModelGenZ.accuracy2, rfModelPioneer.accuracy2, rfModelYoungAdults.accuracy2)
-subsettedCombinedChurnOnly <- subset(combinedChurnOnly, select = c("AverageProbChurn", "FamilyProbChurn", "FliersProbChurn", "GenZProbChurn", "PioneerProbChurn", "YoungAdultsProbChurn"))
+subsettedCombinedChurnOnly <- subset(combinedChurnOnly, select = c("ProbChurn", "AverageProbChurn", "FamilyProbChurn", "FliersProbChurn", "GenZProbChurn", "PioneerProbChurn", "YoungAdultsProbChurn"))
+
 # Finding Better Bundles based on lowest Churn Probs
 minCol <- apply(subsettedCombinedChurnOnly, 1, function(x) {
   names(subsettedCombinedChurnOnly)[which.min(x)]
 })
+
 # Add Recommendation to Table
 subsettedCombinedChurnOnly$Recommended_Bundle <- minCol
 subsettedCombinedChurnOnly
+table(subsettedCombinedChurnOnly$Recommended_Bundle)
+
+# Get original bundle
+OriginalBundle <- c(rep('Average Bundle',     nrow(churnAvg)),
+                    rep('Family Bundle',      nrow(churnFamily)),
+                    rep('Frequent Fliers',    nrow(churnFliers)),
+                    rep('Gen Z Streamers',    nrow(churnGenZ)),
+                    rep('Pioneer Generation', nrow(churnPioneer)),
+                    rep('Young Adults',       nrow(churnYoungAdults)))
+
+
+# verify that number of rows match
+length(OriginalBundle) == nrow(subsettedCombinedChurnOnly)
+                         
 ## Append the columns together into a new table
-accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$customerID, subsettedCombinedChurnOnly)
+accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$customerID, OriginalBundle, subsettedCombinedChurnOnly)
+
 # Verify Correct Customer ID
-nrow(accuracyRFTable2)
-nrow(subsettedCombinedChurnOnly)
+nrow(accuracyRFTable2) == nrow(subsettedCombinedChurnOnly)
 accuracyRFTable2
 
 table(accuracyRFTable2$Recommended_Bundle)
 
 # Export to CSV
-write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = TRUE)
+write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = FALSE)
 
 
 
