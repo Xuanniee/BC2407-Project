@@ -8,9 +8,11 @@ library(caret)
 library(nnet)
 library(randomForest)
 library(smotefamily)
+library(car)
+library(glmnet)
 
 # Importing of Data
-setwd("/Users/ngxua/Documents/Nanyang Technological University/AY22-23 Semester 2/5. BC2407 Analytics II - Advanced Predictive Techniques/Project/Github")
+setwd("C:/Users/Siah Wee Hung/Desktop/BC2407-Project")
 churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.strings = c('NULL'))
 
 ##################################### Variables with Wrong Classification after Import #############################################
@@ -18,17 +20,21 @@ churnData <- read.csv("telecom_customer_churn.csv", stringsAsFactors = TRUE, na.
 # 2. Number of Dependents - Factor instead of Integer
 # 3. City ~ Char instead of Factor
 
-#################################################### Data Cleaning Phase ##########################################################################
+
+# ||=================================||
+# ||                                 ||
+# ||          Data Cleaning          ||
+# ||                                 ||
+# ||=================================||
+
 churnData$City <- factor(churnData$City)
 churnData$Number.of.Dependents <- factor(churnData$Number.of.Dependents)
 churnData$Customer.ID <- as.character(churnData$Customer.ID)
 
 # Dropping Variables that are not relevant for our analysis
-# churnData$Customer.ID <- NULL
-churnData$Latitude <- NULL
+churnData$Latitude  <- NULL
 churnData$Longitude <- NULL
-#churnData$City <- NULL
-churnData$Zip.Code <- NULL
+churnData$Zip.Code  <- NULL
 
 ## Convert all Whitespaces into NA
 churnData[churnData==""] <- NA
@@ -46,7 +52,6 @@ rownames(varTable) <- churnDataVariables
 # Populate the Table with Missing Values
 for (index in 1:numVars){
   # Fill in the Variable & Missing Values
-  # varTable[index, 1] <- sum(is.na(churnData[,get(names(churnData)[index])]))
   varTable[index, 1] <- sum(is.na(churnData[churnDataVariables[index]]))
 }
 
@@ -64,14 +69,7 @@ summary(churnData)
 ## 1. Impute Avg.Monthly.Long.Distance.Charges
 # According to Data Dictionary, 0 if not subscribed to Home Phone
 churnData$Avg.Monthly.Long.Distance.Charges[churnData$Phone.Service == "No"] <- 0
-# churnData$Phone.Service <- NULL
 
-# # Determine the Mean of Long Distance Charges, not removing NA, just not including in mean calculation
-# longDistChargesMean <- mean(churnData$Avg.Monthly.Long.Distance.Charges, na.rm = TRUE)
-# # Impute Long Distance Charges
-# churnData$Avg.Monthly.Long.Distance.Charges <- replace(churnData$Avg.Monthly.Long.Distance.Charges, 
-#                                                        is.na(churnData$Avg.Monthly.Long.Distance.Charges),
-#                                                        longDistChargesMean)
 # Ensure Missing Values are imputed
 sum(is.na(churnData$Avg.Monthly.Long.Distance.Charges))
 
@@ -79,25 +77,12 @@ sum(is.na(churnData$Avg.Monthly.Long.Distance.Charges))
 ## 2. Impute Avg.Monthly.GB.Download
 # 0 if not subscribed to Internet Plan
 churnData$Avg.Monthly.GB.Download[churnData$Internet.Service == "No"] <- 0
-# churnData$Internet.Service <- NULL
 
-# Similarly, we can impute the Avg.Monthly.GB.Download as well. But instead of choosing mean, we will impute
-# it with Median since the spread of GB Download is larger from 2GB to 85GB.
-
-# Determine the Median of Avg Monthly Download
-# avgMthDownloadMedian <- median(churnData$Avg.Monthly.GB.Download, na.rm = TRUE)
-# # Impute Downloads with Median
-# churnData$Avg.Monthly.GB.Download <- replace(churnData$Avg.Monthly.GB.Download,
-#                                              is.na(churnData$Avg.Monthly.GB.Download),
-#                                              avgMthDownloadMedian)
 # Ensure no more Missing Value
 sum(is.na(churnData$Avg.Monthly.GB.Download))
 
 ## 3. Impute Churn.Category
 # Increase the Number of Factors to allow for Different Factors
-# -------------------------- 
-# why dont we just drop those that don't churn?
-# --------------------------
 levels(churnData$Churn.Category) <- c(levels(churnData$Churn.Category), "Staying Customer")
 levels(churnData$Churn.Category) <- c(levels(churnData$Churn.Category), "New Customer")
 
@@ -211,7 +196,13 @@ churnData$Offer[churnData$Offer == "Offer E"] <- "Offer.E"
 # Remove the Old Labels
 churnData$Offer <- droplevels(churnData$Offer)
 
-#################################### Data Visualisation: Univariate Categorical ####################################
+
+
+# ||==============================================================||
+# ||                                                              ||
+# ||          Data Visualisation: Univariate Categorical          ||
+# ||                                                              ||
+# ||==============================================================||
 
 # Gender
 ggplot(data = churnData, aes(x = Gender, fill = Gender)) +
@@ -388,7 +379,11 @@ ggplot(data = edaData, aes(x = Churn.Reason, fill = Churn.Reason)) +
   labs(title = "Proportion of Customer by Reason for Churn")
 
 
-####################################### Data Visualisation: Univariate Numeric #########################################
+# ||==========================================================||
+# ||                                                          ||
+# ||          Data Visualisation: Univariate Numeric          ||
+# ||                                                          ||
+# ||==========================================================||
 
 # Age
 ## The customer’s current age, in years, at the time the fiscal quarter ended (Q2 2022)
@@ -479,7 +474,12 @@ ggplot(churnData, aes(x = Total.Revenue)) +
        y = "Count",
        title = "Histogram of the Total Revenue from Customers by End of Quarter")
 
-#################################### Data Visualisation: Bivariate [Categorical vs Categorical] ####################################
+
+# ||==============================================================================||
+# ||                                                                              ||
+# ||          Data Visualisation: Bivariate [Categorical vs Categorical]          ||
+# ||                                                                              ||
+# ||==============================================================================||
 
 # Gender against Customer.Status
 ggplot(churnData, aes(x = Gender, fill = Customer.Status)) +
@@ -633,10 +633,12 @@ ggplot(churnData, aes(x = Payment.Method, fill = Customer.Status)) +
        title = "Relationship between Payment Methods and Customer Churn") +
   theme_minimal()
 
-## Doesn't make sense to explore with Churn Category and Reason im assuming?
 
-#################################### Data Visualisation: Bivariate [Categorical vs Numeric] ####################################
-#### Violin & Boxplots
+# ||==========================================================================||
+# ||                                                                          ||
+# ||          Data Visualisation: Bivariate [Categorical vs Numeric]          ||
+# ||                                                                          ||
+# ||==========================================================================||
 
 # Age vs Customer.Status
 ggplot(churnData, aes(x = Customer.Status, y = Age, fill = Customer.Status)) +
@@ -762,7 +764,16 @@ ggplot(churnData, aes(x = Customer.Status, y = Total.Revenue, fill = Customer.St
        title = "Relationship between Total.Revenue & Customer.Status")
 
 
-### Extra EDA ####################################################################################################################################
+
+# ||===============================================================================||
+# ||                                                                               ||
+# ||          Data Visualisation: Identify Churn.Reason-specific Patterns          ||
+# ||                                                                               ||
+# ||===============================================================================||
+
+# make copy of original data so we do not mess it up
+df.eda <- churnData
+
 # create subset of dataset where churn reason is something that can be addressed by offering optimal bundles
 actionable.reasons = c('Competitor had better devices', 
                        'Product dissatisfaction', 
@@ -782,21 +793,17 @@ df.stayed.downsample = sample_n(subset(churnData, Churn.Reason=='Staying Custome
 df.combine = rbind(df.actionable.churn, df.stayed.downsample)
 nrow(df.combine)
 
-# remove redundant columns, and change Customer.Status to binary. 1 = churned, 0 = not churned
+# Preprocessing: Feature selection, and change Customer.Status to binary. 1 = churned, 0 = not churned
 set.seed(123)
-df.combine$Y <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
-df.combine$Count <- NULL
-df.combine$Customer.Status.Temp <- NULL
-df.combine$Customer.Status <- NULL
-df.combine$Churn.Reason <- NULL
-df.combine$Churn.Status <- NULL
-df.combine$Churn.Category <- NULL
-df.combine$Usage.Charge.Ratio <- NULL
-df.combine$Number.of.Referrals <- NULL
-df.combine$Offer <- NULL
-df.combine$Payment.Method <- NULL
-df.combine$Paperless.Billing <- NULL
-df.combine$City <- NULL
+df.combine$Y                    <- factor(ifelse(df.combine$Customer.Status=='Churned', 1, 0))
+df.combine$Customer.ID          <- NULL
+df.combine$Customer.Status      <- NULL
+df.combine$Churn.Reason         <- NULL
+df.combine$Churn.Category       <- NULL
+df.combine$Number.of.Referrals  <- NULL
+df.combine$Offer                <- NULL
+df.combine$Payment.Method       <- NULL
+df.combine$Paperless.Billing    <- NULL
 str(df.combine)
 
 # train a logistic regression model on the subset of data. No need train test split since we just want to find variable importance
@@ -804,18 +811,29 @@ model <- glm(Y ~ ., data=df.combine, family='binomial') #control = list(maxit = 
 options(max.print=5000)
 summary(model)
 
+# Based on LR model, statistical significant variables in predicting churn:
+# - Monthly.Charge
+# - Contract
+# - Streaming.TV
+# - Premium.Tech.Support
+# - Online.Security
+# - Tenure.in.Months
+# - City
+# - Number.of.Dependents
+# - Age
+
 
 # relationship between unlimited data and churn reasons related to data ['competitor made better offer', 'competitor offered more data', 'extra data charges']
-churnData$Count <- rep(1, nrow(churnData))
+df.eda$Count <- rep(1, nrow(df.eda))
 
-ggplot(subset(churnData, Churn.Reason %in% c('Staying Customer', 'New Customer', 'Competitor made better offer', 'Extra data charges', 'Competitor offered more data')), aes(x=Churn.Reason, y=Count, fill=Unlimited.Data)) +
+ggplot(subset(df.eda, Churn.Reason %in% c('Staying Customer', 'New Customer', 'Competitor made better offer', 'Extra data charges', 'Competitor offered more data')), aes(x=Churn.Reason, y=Count, fill=Unlimited.Data)) +
   geom_bar(position = "fill",stat = "identity") +
   labs(x = "Churn.Reason",
        y = "Proportion",
        title = "Proportion of Unlimited.Data for each Churn.Reason")
 
 # relationship between tenure and customer status
-ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
+ggplot(subset(df.eda, Customer.Status != 'Joined'), aes(x = Customer.Status, y = Tenure.in.Months, fill = Customer.Status)) +
   geom_violin() +
   geom_boxplot(width = 0.1,
                fill = "Orange",
@@ -828,10 +846,10 @@ ggplot(subset(churnData, Customer.Status != 'Joined'), aes(x = Customer.Status, 
 
 
 # distribution of usage charge ratio for customers that churned because of "price too high" and customers that didn't churn / churned for other reasons (histogram)
-churnData$Usage.Charge.Ratio <- pmax(churnData$Monthly.Charge / churnData$Avg.Monthly.GB.Download, rep(0, nrow(churnData)))
-churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Price too high', 'Price too high', 'Not Churned / Other reasons'))
+df.eda$Usage.Charge.Ratio <- pmax(df.eda$Monthly.Charge / df.eda$Avg.Monthly.GB.Download, rep(0, nrow(df.eda)))
+df.eda$Customer.Status.Temp <- factor(ifelse(df.eda$Churn.Reason=='Price too high', 'Price too high', 'Not Churned / Other reasons'))
 
-ggplot(churnData, aes(x=log(1+Usage.Charge.Ratio), fill=Customer.Status.Temp)) +
+ggplot(df.eda, aes(x=log(1+Usage.Charge.Ratio), fill=Customer.Status.Temp)) +
   geom_histogram(aes(y = after_stat(c(
     count[group==1] / sum(count[group==1]),
     count[group==2] / sum(count[group==2])
@@ -847,7 +865,7 @@ ggplot(churnData, aes(x=log(1+Usage.Charge.Ratio), fill=Customer.Status.Temp)) +
 
 # distribution of usage charge ratio for customers that churned because of "price too high" and customers that didn't churn / churned for other reasons (boxplot)
 # graph too right skewed, need log transformation
-ggplot(churnData, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Customer.Status)) +
+ggplot(df.eda, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Customer.Status)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
                fill = "Orange",
@@ -858,7 +876,7 @@ ggplot(churnData, aes(x = Customer.Status, y = Usage.Charge.Ratio, fill = Custom
        title = "Relationship between Usage.Charge.Ratio & Customer.Status")
 
 
-ggplot(churnData, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill = Customer.Status.Temp)) +
+ggplot(df.eda, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill = Customer.Status.Temp)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
                fill = "Orange",
@@ -870,9 +888,9 @@ ggplot(churnData, aes(x=Customer.Status.Temp, y=log(1+Usage.Charge.Ratio), fill 
        title = "Relationship between Usage.Charge.Ratio & Customer.Status")
 
 # distribution of monthly data usage for customers that churned because "competitor offered more data" and customers that didn't churn / churned for other reasons
-churnData$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Competitor offered more data', 'Competitor offered more data', 'Not Churned / Other reasons'))
+df.eda$Customer.Status.Temp <- factor(ifelse(churnData$Churn.Reason=='Competitor offered more data', 'Competitor offered more data', 'Not Churned / Other reasons'))
 
-ggplot(churnData, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fill = Customer.Status.Temp)) +
+ggplot(df.eda, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fill = Customer.Status.Temp)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
                fill = "Orange",
@@ -885,29 +903,29 @@ ggplot(churnData, aes(x = Customer.Status.Temp, y = Avg.Monthly.GB.Download, fil
 
 
 # Proportion of churn for each of the different service count categories 
-churnData$Customer.Status.Temp <- factor(ifelse(churnData$Customer.Status=='Churned', 'Churned', 'Not Churned'))
+df.eda$Customer.Status.Temp <- factor(ifelse(df.eda$Customer.Status=='Churned', 'Churned', 'Not Churned'))
 
 # make a new col Service.Count which is just the number of services the customer has subscribed to
-churnData$Service.Count = factor(
-  ifelse(churnData$Streaming.Music=='Yes', 1, 0) + 
-    ifelse(churnData$Streaming.Movies=='Yes', 1, 0) +
-    ifelse(churnData$Streaming.TV=='Yes', 1, 0) +
-    ifelse(churnData$Premium.Tech.Support=='Yes', 1, 0) +
-    ifelse(churnData$Device.Protection.Plan=='Yes', 1, 0) +
-    ifelse(churnData$Online.Backup=='Yes', 1, 0) +
-    ifelse(churnData$Online.Security=='Yes', 1, 0)
+df.eda$Service.Count = factor(
+    ifelse(df.eda$Streaming.Music=='Yes', 1, 0) + 
+    ifelse(df.eda$Streaming.Movies=='Yes', 1, 0) +
+    ifelse(df.eda$Streaming.TV=='Yes', 1, 0) +
+    ifelse(df.eda$Premium.Tech.Support=='Yes', 1, 0) +
+    ifelse(df.eda$Device.Protection.Plan=='Yes', 1, 0) +
+    ifelse(df.eda$Online.Backup=='Yes', 1, 0) +
+    ifelse(df.eda$Online.Security=='Yes', 1, 0)
 )
 
-ggplot(churnData, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
+ggplot(df.eda, aes(x = Service.Count, y=Count, fill = Customer.Status.Temp)) +
   geom_bar(stat = "identity", position="fill")
 
 # relationship between age and Avg.Monthly.GB.Download for customers that churned and those that did not churn
-ggplot(churnData, aes(x = Age, y = Avg.Monthly.GB.Download)) +
+ggplot(df.eda, aes(x = Age, y = Avg.Monthly.GB.Download)) +
   geom_jitter(aes(color=Customer.Status.Temp), width=0.1, alpha=0.5) +
   scale_color_manual(values=c('Churned'='#F9766E', 'Not Churned'='#00BFC4'))
 
 # distribution of Avg.Monthly.GB.Download for customers of Age<30 that churned and those that did not churn
-ggplot(subset(churnData, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Status.Temp, fill=Customer.Status.Temp)) +
+ggplot(subset(df.eda, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Status.Temp, fill=Customer.Status.Temp)) +
   geom_violin() +
   geom_boxplot(width = 0.5,
                fill = "Orange",
@@ -919,25 +937,33 @@ ggplot(subset(churnData, Age<30), aes(y=Avg.Monthly.GB.Download, x=Customer.Stat
        title = "Relationship between Avg.Monthly.GB.Download & Customer.Status for Age<30")
 
 # Number of Dependents against Customer.Status
-churnData$Number.of.Dependents.Bin <- as.numeric(churnData$Number.of.Dependents)-1
-churnData$Number.of.Dependents.Bin = ifelse(churnData$Number.of.Dependents.Bin < 3, churnData$Number.of.Dependents.Bin, '>=3')
-ggplot(churnData, aes(x = factor(Number.of.Dependents.Bin, levels=c('0','1','2', '>=3')), y=Count, fill = Customer.Status)) +
+df.eda$Number.of.Dependents.Bin <- as.numeric(df.eda$Number.of.Dependents)-1
+df.eda$Number.of.Dependents.Bin = ifelse(df.eda$Number.of.Dependents.Bin < 3, df.eda$Number.of.Dependents.Bin, '>=3')
+ggplot(df.eda, aes(x = factor(Number.of.Dependents.Bin, levels=c('0','1','2', '>=3')), y=Count, fill = Customer.Status)) +
   geom_bar(position = "fill",stat = "identity") +
   labs(x = "Number.of.Dependents",
        y = "Proportion",
        title = "Proportion of Unlimited.Data for each Churn.Reason")
 theme_minimal()
-  
-### Further Data Processing ########################################################################################################################
 
+
+# ||===========================================||
+# ||                                           ||
+# ||          Further Data Processing          ||
+# ||                                           ||
+# ||===========================================||
+
+# +----------------------------------+
+# |    Prelimary bundle assignment   |
+# +----------------------------------+
 # Setting the Threshold for Avg Monthly Data Usage
 quantile(churnData$Avg.Monthly.GB.Download, probs = c(0.25, 0.50, 0.75))
-lowDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.25)
+lowDataThreshold  <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.25)
 highDataThreshold <- quantile(churnData$Avg.Monthly.GB.Download, probs = 0.75)
 
 # Setting the Threshold for Avg Monthly Long Distance Charges
 quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
-lowLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.25)
+lowLongDistanceThreshold  <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.25)
 highLongDistanceThreshold <- quantile(churnData$Avg.Monthly.Long.Distance.Charges, probs = 0.75)
 
 # Setting for Threshold for Extra Data Charges
@@ -946,34 +972,36 @@ quantile(churnData$Total.Extra.Data.Charges, probs = c(0.25, 0.50, 0.75))
 
 # Setting the Threshold for Total Long Distance Charges
 quantile(churnData$Total.Long.Distance.Charges, probs = c(0.25, 0.50, 0.75))
-lowTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.25)
+lowTotalLongDistThreshold  <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.25)
 highTotalLongDistThreshold <- quantile(churnData$Total.Long.Distance.Charges, probs = 0.75)
 
 # Creating a New Independent Variable, Customer's Assigned Bundle
 churnData$Assigned.Bundle <- NA
 # Creating 6 Mobile Bundles
-levels(churnData$Assigned.Bundle) <- c("Young Adults", "Pioneer Generation", "Family Bundle", 
-                                              "Gen Z Streamers", "Frequent Fliers", "Average Bundle")
-
-## Assigning them a bundle ############################################################################################################
+levels(churnData$Assigned.Bundle) <- c("Young Adults", 
+                                       "Pioneer Generation", 
+                                       "Family Bundle", 
+                                       "Gen Z Streamers", 
+                                       "Frequent Fliers", 
+                                       "Average Bundle")
 
 # Initial Number of People without Bundle
 sum(is.na(churnData$Assigned.Bundle))
 
-# Frequent Fliers
-churnData$Assigned.Bundle[churnData$Total.Long.Distance.Charges > highTotalLongDistThreshold] <- "Frequent Fliers"
-
-# Young Adults - Also with Unlimited Data
-churnData$Assigned.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges < lowLongDistanceThreshold & churnData$Unlimited.Data == "Yes"] <- "Young Adults"
-
 # Pioneer Generation - Discounts due to Age
-churnData$Assigned.Bundle[churnData$Age > 60 & churnData$Avg.Monthly.GB.Download < lowDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges > highLongDistanceThreshold] <- "Pioneer Generation"
+churnData$Assigned.Bundle[churnData$Age > 60 & churnData$Avg.Monthly.GB.Download < lowDataThreshold] <- "Pioneer Generation"
 
 # Family Bundle
 churnData$Assigned.Bundle[churnData$Multiple.Lines == "Yes" & churnData$Number.of.Dependents != "0" & churnData$Married == "Yes"] <- "Family Bundle"
 
 # Gen Z
 churnData$Assigned.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & (churnData$Streaming.Movies == "Yes" | churnData$Streaming.Music == "Yes" | churnData$Streaming.TV == "Yes")] <- "Gen Z Streamers"
+
+# Young Adults - Also with Unlimited Data
+churnData$Assigned.Bundle[churnData$Avg.Monthly.GB.Download > highDataThreshold & churnData$Avg.Monthly.Long.Distance.Charges < lowLongDistanceThreshold & churnData$Unlimited.Data == "Yes"] <- "Young Adults"
+
+# Frequent Fliers
+churnData$Assigned.Bundle[churnData$Total.Long.Distance.Charges > highTotalLongDistThreshold] <- "Frequent Fliers"
 
 # Average Bundle - For now, if no Special Terms
 churnData$Assigned.Bundle[is.na(churnData$Assigned.Bundle)] <- "Average Bundle"
@@ -983,7 +1011,11 @@ churnData$Assigned.Bundle <- as.factor(churnData$Assigned.Bundle)
 # Verify all Customers should have an Mobile Bundle that is Compatible with them!!
 sum(is.na(churnData$Assigned.Bundle))
 
-## Assigning bundles for Customer who churn  ############################################################################################################
+
+# +--------------------------------------------------+
+# |    Re-asigning bundles for Customer who churn    |
+# +--------------------------------------------------+
+
 # Create the derived Dependent Variable, Churn
 churnData$Churn[churnData$Customer.Status == "Stayed"] <- "Not Churned"
 churnData$Churn[churnData$Customer.Status == "Joined"] <- "Not Churned"
@@ -1010,7 +1042,7 @@ sum(churnData$Assigned.Bundle == "Average Bundle")
 
 # Extra Data Charges - Should add 39 {Added Less}
 sum(churnData$Assigned.Bundle == "Average Bundle")
-churnData$Assigned.Bundle[churnData$Churn.Reason == "Extra data charges"] <- "Average Bundle"
+  churnData$Assigned.Bundle[churnData$Churn.Reason == "Extra data charges"] <- "Average Bundle"
 sum(churnData$Assigned.Bundle == "Average Bundle")
 
 # Lack of Affordable Upload/Downloads - Should add 30
@@ -1028,23 +1060,33 @@ sum(churnData$Assigned.Bundle == "Frequent Fliers")
 churnData$Assigned.Bundle[churnData$Churn.Reason == "Price too high"] <- "Frequent Fliers"
 sum(churnData$Assigned.Bundle == "Frequent Fliers")
 
-### Machine Learning Models ########################################################################################################################
-# Predicting Churn
-churnData$City <- NULL
-set.seed(123)
+table(churnData$Assigned.Bundle)
+
+
+# ||===========================================||
+# ||                                           ||
+# ||          Machine Learning Models          ||
+# ||                                           ||
+# ||===========================================||
+
+# Final data pre-processing
+set.seed(4)
 
 churnData2 <- churnData
+
+churnData2$City <- NULL
+
 # Remove Whitespace
 names(churnData2) <- make.names(names(churnData2))
-# stayed / joined -> 0, churned -> 1. Churn is our label.
-churnData2$Churn <- ifelse(churnData2$Customer.Status=='Churned', 1, 0)
+churnData2$Churn <- ifelse(churnData2$Customer.Status=='Churned', 1, 0) # stayed / joined -> 0, churned -> 1. Churn is our label.
+
+customerID <- churnData2$Customer.ID # store customer ID first so we can re-attach in the final test dataframe
 
 # prevent look-ahead bias
-churnData2$Customer.Status <- NULL
-churnData2$Churn.Category  <- NULL
-churnData2$Churn.Reason    <- NULL
-customerID <- churnData2$Customer.ID
-churnData2$Customer.ID <- NULL
+churnData2$Customer.Status     <- NULL
+churnData2$Churn.Category      <- NULL
+churnData2$Churn.Reason        <- NULL
+churnData2$Customer.ID         <- NULL
 
 # irrelevant
 churnData2$Offer               <- NULL  
@@ -1055,20 +1097,21 @@ churnData2$Number.of.Referrals <- NULL
 # 2-factor to binary
 churnData2$Male                 <- ifelse(churnData2$Gender=='Male', 1, 0) # change from "Gender" to "Male" for better readibility
 churnData2$Gender               <- NULL # drop "Gender" since we have new column "Male"
-churnData2$Married              <- ifelse(churnData2$Married=='Yes', 1, 0)
-churnData2$Streaming.Movies     <- ifelse(churnData2$Streaming.Movies=='Yes', 1, 0)
-churnData2$Streaming.Music      <- ifelse(churnData2$Streaming.Music=='Yes', 1, 0)
-churnData2$Streaming.TV         <- ifelse(churnData2$Streaming.TV=='Yes', 1, 0)
-churnData2$Unlimited.Data       <- ifelse(churnData2$Unlimited.Data=='Yes', 1, 0)
+churnData2$Married              <- ifelse(churnData2$Married             =='Yes', 1, 0)
+churnData2$Streaming.Movies     <- ifelse(churnData2$Streaming.Movies    =='Yes', 1, 0)
+churnData2$Streaming.Music      <- ifelse(churnData2$Streaming.Music     =='Yes', 1, 0)
+churnData2$Streaming.TV         <- ifelse(churnData2$Streaming.TV        =='Yes', 1, 0)
+churnData2$Unlimited.Data       <- ifelse(churnData2$Unlimited.Data      =='Yes', 1, 0)
 churnData2$Premium.Tech.Support <- ifelse(churnData2$Premium.Tech.Support=='Yes', 1, 0)
-churnData2$Internet.Service     <- ifelse(churnData2$Internet.Service=='Yes', 1, 0)
-churnData2$Multiple.Lines       <- ifelse(churnData2$Multiple.Lines=='Yes', 1, 0)
-churnData2$Phone.Service        <- ifelse(churnData2$Phone.Service=='Yes', 1, 0)
+churnData2$Internet.Service     <- ifelse(churnData2$Internet.Service    =='Yes', 1, 0)
+churnData2$Multiple.Lines       <- ifelse(churnData2$Multiple.Lines      =='Yes', 1, 0)
+churnData2$Phone.Service        <- ifelse(churnData2$Phone.Service       =='Yes', 1, 0)
 
 # Prerequisite of SMOTE is a numeric dataset, so categorical must be converted to numbers. 
 # This can be done via one-hot encoding
 bundles <- churnData2$Assigned.Bundle # store the Assigned.Bundle column first before removing it from the dataframe to be over sampled
 churnData2.no.bundle <- churnData2[, !names(churnData2) %in% c('Assigned.Bundle')] # dataframe w/o Assigned.Bundle column so that the Assigned.Bundle column does not get encoded
+
 # one-hot encoding
 dummy <- dummyVars(" ~ .", data=churnData2.no.bundle)
 churnData2 <- as.data.frame(predict(dummy, newdata=churnData2.no.bundle))
@@ -1084,7 +1127,7 @@ testChurnData <- churnData2[-trainIndex, ]
 
 str(trainChurnData)
 
-# subset dataset by Assigned.Bundle
+# subset train set by Assigned.Bundle
 trainChurnData.average <- subset(trainChurnData, Assigned.Bundle=='Average Bundle')
 trainChurnData.family  <- subset(trainChurnData, Assigned.Bundle=='Family Bundle')
 trainChurnData.fliers  <- subset(trainChurnData, Assigned.Bundle=='Frequent Fliers')
@@ -1092,86 +1135,79 @@ trainChurnData.genz    <- subset(trainChurnData, Assigned.Bundle=='Gen Z Streame
 trainChurnData.pioneer <- subset(trainChurnData, Assigned.Bundle=='Pioneer Generation')
 trainChurnData.adults  <- subset(trainChurnData, Assigned.Bundle=='Young Adults')
 
-avgCustomerID <- trainChurnData.average$customerID
-familyCustomerID <- trainChurnData.family$customerID
-fliersCustomerID <- trainChurnData.fliers$customerID
-genzCustomerID <- trainChurnData.genz$customerID
-pioneerCustomerID <- trainChurnData.pioneer$customerID
+# stash away customer IDs first so we can drop them during training and testing, then re-attach during demo
+avgCustomerID         <- trainChurnData.average$customerID
+familyCustomerID      <- trainChurnData.family$customerID
+fliersCustomerID      <- trainChurnData.fliers$customerID
+genzCustomerID        <- trainChurnData.genz$customerID
+pioneerCustomerID     <- trainChurnData.pioneer$customerID
 youngAdultsCustomerID <- trainChurnData.adults$customerID
+
 trainChurnData.average$customerID <- NULL
-trainChurnData.family$customerID <- NULL
-trainChurnData.fliers$customerID <- NULL
-trainChurnData.genz$customerID <- NULL
+trainChurnData.family$customerID  <- NULL
+trainChurnData.fliers$customerID  <- NULL
+trainChurnData.genz$customerID    <- NULL
 trainChurnData.pioneer$customerID <- NULL
-trainChurnData.adults$customerID <- NULL
+trainChurnData.adults$customerID  <- NULL
 
 # over-sample using SMOTE
-trainChurnData.smote.average <- SMOTE(X=trainChurnData.average[, !names(trainChurnData.average) %in% c('Assigned.Bundle')], target=trainChurnData.average$Churn)$data
-trainChurnData.smote.family  <- SMOTE(X=trainChurnData.family[, !names(trainChurnData.family) %in% c('Assigned.Bundle')], target=trainChurnData.family$Churn)$data
-trainChurnData.smote.fliers  <- SMOTE(X=trainChurnData.fliers[, !names(trainChurnData.fliers) %in% c('Assigned.Bundle')], target=trainChurnData.fliers$Churn)$data
-trainChurnData.smote.genz    <- SMOTE(X=trainChurnData.genz[, !names(trainChurnData.genz) %in% c('Assigned.Bundle')], target=trainChurnData.genz$Churn)$data
-trainChurnData.smote.pioneer <- SMOTE(X=trainChurnData.pioneer[, !names(trainChurnData.pioneer) %in% c('Assigned.Bundle')], target=trainChurnData.pioneer$Churn)$data
-trainChurnData.smote.adults  <- SMOTE(X=trainChurnData.adults[, !names(trainChurnData.adults) %in% c('Assigned.Bundle')], target=trainChurnData.adults$Churn)$data
+averageTrainChurnData     <- SMOTE(X=trainChurnData.average[, !names(trainChurnData.average) %in% c('Assigned.Bundle')], target=trainChurnData.average$Churn)$data
+familyTrainChurnData      <- SMOTE(X=trainChurnData.family[, !names(trainChurnData.family) %in% c('Assigned.Bundle')], target=trainChurnData.family$Churn)$data
+fliersTrainChurnData      <- SMOTE(X=trainChurnData.fliers[, !names(trainChurnData.fliers) %in% c('Assigned.Bundle')], target=trainChurnData.fliers$Churn)$data
+genZTrainChurnData        <- SMOTE(X=trainChurnData.genz[, !names(trainChurnData.genz) %in% c('Assigned.Bundle')], target=trainChurnData.genz$Churn)$data
+pioneerTrainChurnData     <- SMOTE(X=trainChurnData.pioneer[, !names(trainChurnData.pioneer) %in% c('Assigned.Bundle')], target=trainChurnData.pioneer$Churn)$data
+youngAdultsTrainChurnData <- SMOTE(X=trainChurnData.adults[, !names(trainChurnData.adults) %in% c('Assigned.Bundle')], target=trainChurnData.adults$Churn)$data
 
 # remove automatically-generated column "class" from SMOTE-ing
-trainChurnData.smote.average$class <- NULL
-trainChurnData.smote.family$class  <- NULL
-trainChurnData.smote.fliers$class  <- NULL
-trainChurnData.smote.genz$class    <- NULL
-trainChurnData.smote.pioneer$class <- NULL
-trainChurnData.smote.adults$class  <- NULL
+averageTrainChurnData$class     <- NULL
+familyTrainChurnData$class      <- NULL
+fliersTrainChurnData$class      <- NULL
+genZTrainChurnData$class        <- NULL
+pioneerTrainChurnData$class     <- NULL
+youngAdultsTrainChurnData$class <- NULL
 
-# trainChurnData.smote.average <- cbind(avgCustomerID, trainChurnData.smote.average)
-# trainChurnData.smote.family <- cbind(familyCustomerID, trainChurnData.smote.family)
-# trainChurnData.smote.fliers <- cbind(fliersCustomerID, trainChurnData.smote.fliers)
-# trainChurnData.smote.genz <- cbind(genzCustomerID, trainChurnData.smote.genz)
-# trainChurnData.smote.pioneer <- cbind(pioneerCustomerID, trainChurnData.smote.pioneer)
-# trainChurnData.smote.adults <- cbind(youngAdultsCustomerID, trainChurnData.smote.adults)
-
-# Subset 6 Datasets for 6 Mobile Plans
-## Subsetting Train Dataset
-averageTrainChurnData <- trainChurnData.smote.average#subset(trainChurnData, Assigned.Bundle == "Average Bundle")
-familyTrainChurnData <- trainChurnData.smote.family#subset(trainChurnData, Assigned.Bundle == "Family Bundle")
-fliersTrainChurnData <- trainChurnData.smote.fliers#subset(trainChurnData, Assigned.Bundle == "Frequent Fliers")
-genZTrainChurnData <- trainChurnData.smote.genz#subset(trainChurnData, Assigned.Bundle == "Gen Z Streamers")
-pioneerTrainChurnData <- trainChurnData.smote.pioneer#subset(trainChurnData, Assigned.Bundle == "Pioneer Generation")
-youngAdultsTrainChurnData <- trainChurnData.smote.adults#subset(trainChurnData, Assigned.Bundle == "Young Adults")
-
-## Subsetting Test Dataset
-averageTestChurnData <- subset(testChurnData, Assigned.Bundle == "Average Bundle")
-familyTestChurnData <- subset(testChurnData, Assigned.Bundle == "Family Bundle")
-fliersTestChurnData <- subset(testChurnData, Assigned.Bundle == "Frequent Fliers")
-genZTestChurnData <- subset(testChurnData, Assigned.Bundle == "Gen Z Streamers")
-pioneerTestChurnData <- subset(testChurnData, Assigned.Bundle == "Pioneer Generation")
+# Subset test set by Assigned.Bundle
+averageTestChurnData     <- subset(testChurnData, Assigned.Bundle == "Average Bundle")
+familyTestChurnData      <- subset(testChurnData, Assigned.Bundle == "Family Bundle")
+fliersTestChurnData      <- subset(testChurnData, Assigned.Bundle == "Frequent Fliers")
+genZTestChurnData        <- subset(testChurnData, Assigned.Bundle == "Gen Z Streamers")
+pioneerTestChurnData     <- subset(testChurnData, Assigned.Bundle == "Pioneer Generation")
 youngAdultsTestChurnData <- subset(testChurnData, Assigned.Bundle == "Young Adults")
 
 # Making Churn a Factor for RF
-averageTrainChurnData$Churn <- factor(averageTrainChurnData$Churn)
-familyTrainChurnData$Churn <- factor(familyTrainChurnData$Churn)
-fliersTrainChurnData$Churn <- factor(fliersTrainChurnData$Churn)
-genZTrainChurnData$Churn <- factor(genZTrainChurnData$Churn)
-pioneerTrainChurnData$Churn <- factor(pioneerTrainChurnData$Churn)
+averageTrainChurnData$Churn     <- factor(averageTrainChurnData$Churn)
+familyTrainChurnData$Churn      <- factor(familyTrainChurnData$Churn)
+fliersTrainChurnData$Churn      <- factor(fliersTrainChurnData$Churn)
+genZTrainChurnData$Churn        <- factor(genZTrainChurnData$Churn)
+pioneerTrainChurnData$Churn     <- factor(pioneerTrainChurnData$Churn)
 youngAdultsTrainChurnData$Churn <- factor(youngAdultsTrainChurnData$Churn)
 
-averageTestChurnData$Churn <- factor(averageTestChurnData$Churn)
-familyTestChurnData$Churn <- factor(familyTestChurnData$Churn)
-fliersTestChurnData$Churn <- factor(fliersTestChurnData$Churn)
-genZTestChurnData$Churn <- factor(genZTestChurnData$Churn)
-pioneerTestChurnData$Churn <- factor(pioneerTestChurnData$Churn)
-youngAdultsTestChurnData$Churn <- factor(youngAdultsTestChurnData$Churn)
+averageTestChurnData$Churn      <- factor(averageTestChurnData$Churn)
+familyTestChurnData$Churn       <- factor(familyTestChurnData$Churn)
+fliersTestChurnData$Churn       <- factor(fliersTestChurnData$Churn)
+genZTestChurnData$Churn         <- factor(genZTestChurnData$Churn)
+pioneerTestChurnData$Churn      <- factor(pioneerTestChurnData$Churn)
+youngAdultsTestChurnData$Churn  <- factor(youngAdultsTestChurnData$Churn)
 
 
-## Random Forest ####################################################################################################################
-## 1. Average Bundle RF Model
+# ||===========================================================||
+# ||                                                           ||
+# ||          Machine Learning Model 1: Random Forest          ||
+# ||                                                           ||
+# ||===========================================================||
 
+# +----------------------+
+# |    Average bundle    |
+# +----------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelAvg <- randomForest(Churn ~ ., data = averageTrainChurnData, importance = TRUE,
-                         ntree = 500, mtry = 2)
+                           ntree = 500, mtry = 2)
 # Identify the Churn Probability
 predict(rfModelAvg, newdata = averageTestChurnData, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 averageTestChurnData$ProbChurn <- predict(rfModelAvg, newdata = averageTestChurnData, type = "prob")[, 2] * 100
 rfModelAvg.predict <- predict(rfModelAvg, newdata = averageTestChurnData)
+
 # Verify & view the probability of churning for the first 10 customers
 head(select(averageTestChurnData, Churn, ProbChurn), 10)
 
@@ -1185,10 +1221,9 @@ confusionMatrix(rfModelAvg.predict, averageTestChurnData$Churn)
 rfModelAvg.accuracy <- mean(averageTestChurnData$Churn == rfModelAvg.predict)
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelAvg.accuracy * 100, "%.\n")
 
-
-
-## 2. Family Bundle
-
+# +---------------------+
+# |    Family bundle    |
+# +---------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelFamily <- randomForest(Churn ~ ., data = familyTrainChurnData, importance = TRUE,
                            ntree = 500, mtry = 2)
@@ -1210,10 +1245,9 @@ confusionMatrix(rfModelFamily.predict, familyTestChurnData$Churn)
 rfModelFamily.accuracy <- mean(familyTestChurnData$Churn == rfModelFamily.predict)
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelFamily.accuracy * 100, "%.\n")
 
-
-
-## 3. Frequent Fliers
-
+# +-----------------------+
+# |    Frequent fliers    |
+# +-----------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelFliers <- randomForest(Churn ~ ., data = fliersTrainChurnData, importance = TRUE,
                               ntree = 500, mtry = 2)
@@ -1235,11 +1269,9 @@ confusionMatrix(rfModelFliers.predict, fliersTestChurnData$Churn)
 rfModelFliers.accuracy <- mean(fliersTestChurnData$Churn == rfModelFliers.predict)
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelFliers.accuracy * 100, "%.\n")
 
-
-
-
-## 4. Gen Z Streamers
-
+# +-----------------------+
+# |    Gen Z streamers    |
+# +-----------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelGenZ <- randomForest(Churn ~ ., data = genZTrainChurnData, importance = TRUE,
                               ntree = 500, mtry = 2)
@@ -1261,11 +1293,9 @@ confusionMatrix(rfModelGenZ.predict, genZTestChurnData$Churn)
 rfModelGenZ.accuracy <- mean(genZTestChurnData$Churn == rfModelGenZ.predict)
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelGenZ.accuracy * 100, "%.\n")
 
-
-
-
-## 5. Pioneer Generation
-
+# +--------------------------+
+# |    Pioneer generation    |
+# +--------------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelPioneer <- randomForest(Churn ~ ., data = pioneerTrainChurnData, importance = TRUE,
                             ntree = 500, mtry = 2)
@@ -1287,11 +1317,9 @@ confusionMatrix(rfModelPioneer.predict, pioneerTestChurnData$Churn)
 rfModelPioneer.accuracy <- mean(pioneerTestChurnData$Churn == rfModelPioneer.predict)
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelPioneer.accuracy * 100, "%.\n")
 
-
-
-
-## 6. Young Adults
-
+# +------------------+
+# |   Young Adults   |
+# +------------------+
 # Fit the Random Forest Model to Predict Churn
 rfModelYoungAdults <- randomForest(Churn ~ ., data = youngAdultsTrainChurnData, importance = TRUE,
                                ntree = 500, mtry = 2)
@@ -1314,27 +1342,28 @@ rfModelYoungAdults.accuracy <- mean(youngAdultsTestChurnData$Churn == rfModelYou
 cat("Accuracy of Random Forest (No Feature Selection)", rfModelYoungAdults.accuracy * 100, "%.\n")
 
 # Determine the Number of People whose Churn Probs > 80%
-rfModelAvg.numChurn <- length(averageTestChurnData$ProbChurn[averageTestChurnData$ProbChurn > 80])
+churnThreshold   <- 80
+rfModelAvg.numChurn <- length(averageTestChurnData$ProbChurn[averageTestChurnData$ProbChurn > churnThreshold])
 rfModelAvg.size <- nrow(averageTestChurnData)
 rfModelAvg.percentageChurn <- (rfModelAvg.numChurn/rfModelAvg.size) * 100
 
-rfModelFamily.numChurn <- length(familyTestChurnData$ProbChurn[familyTestChurnData$ProbChurn > 80])
+rfModelFamily.numChurn <- length(familyTestChurnData$ProbChurn[familyTestChurnData$ProbChurn > churnThreshold])
 rfModelFamily.size <- nrow(familyTestChurnData)
 rfModelFamily.percentageChurn <- (rfModelFamily.numChurn/rfModelFamily.size) * 100
 
-rfModelFliers.numChurn <- length(fliersTestChurnData$ProbChurn[fliersTestChurnData$ProbChurn > 80])
+rfModelFliers.numChurn <- length(fliersTestChurnData$ProbChurn[fliersTestChurnData$ProbChurn > churnThreshold])
 rfModelFliers.size <- nrow(fliersTestChurnData)
 rfModelFliers.percentageChurn <- (rfModelFliers.numChurn/rfModelFliers.size) * 100
 
-rfModelGenZ.numChurn <- length(genZTestChurnData$ProbChurn[genZTestChurnData$ProbChurn > 80])
+rfModelGenZ.numChurn <- length(genZTestChurnData$ProbChurn[genZTestChurnData$ProbChurn > churnThreshold])
 rfModelGenZ.size <- nrow(genZTestChurnData)
 rfModelGenZ.percentageChurn <- (rfModelGenZ.numChurn/rfModelGenZ.size) * 100
 
-rfModelPioneer.numChurn <- length(pioneerTestChurnData$ProbChurn[pioneerTestChurnData$ProbChurn > 80])
+rfModelPioneer.numChurn <- length(pioneerTestChurnData$ProbChurn[pioneerTestChurnData$ProbChurn > churnThreshold])
 rfModelPioneer.size <- nrow(pioneerTestChurnData)
 rfModelPioneer.percentageChurn <- (rfModelPioneer.numChurn/rfModelPioneer.size) * 100
 
-rfModelYoungAdults.numChurn <- length(youngAdultsTestChurnData$ProbChurn[youngAdultsTestChurnData$ProbChurn > 80])
+rfModelYoungAdults.numChurn <- length(youngAdultsTestChurnData$ProbChurn[youngAdultsTestChurnData$ProbChurn > churnThreshold])
 rfModelYoungAdults.size <- nrow(unique(youngAdultsTestChurnData))
 rfModelYoungAdults.percentageChurn <- (rfModelYoungAdults.numChurn/rfModelYoungAdults.size) * 100
 
@@ -1349,18 +1378,20 @@ accuracyRFTable <- data.frame(Model = modelNames, Accuracy = modelAccuracies, Ch
 accuracyRFTable
 
 # Subset the People who churned from all the 6 Test Datasets
-churnAvg <- averageTestChurnData[averageTestChurnData$ProbChurn > 80, ]
-churnFamily <- familyTestChurnData[familyTestChurnData$ProbChurn > 80, ]
-churnFliers <- fliersTestChurnData[fliersTestChurnData$ProbChurn > 80, ]
-churnGenZ <- genZTestChurnData[genZTestChurnData$ProbChurn > 80, ]
-churnPioneer <- pioneerTestChurnData[pioneerTestChurnData$ProbChurn > 80, ]
-churnYoungAdults <- youngAdultsTestChurnData[youngAdultsTestChurnData$ProbChurn > 80, ]
+churnAvg         <- averageTestChurnData[averageTestChurnData$ProbChurn         > churnThreshold, ]
+churnFamily      <- familyTestChurnData[familyTestChurnData$ProbChurn           > churnThreshold, ]
+churnFliers      <- fliersTestChurnData[fliersTestChurnData$ProbChurn           > churnThreshold, ]
+churnGenZ        <- genZTestChurnData[genZTestChurnData$ProbChurn               > churnThreshold, ]
+churnPioneer     <- pioneerTestChurnData[pioneerTestChurnData$ProbChurn         > churnThreshold, ]
+churnYoungAdults <- youngAdultsTestChurnData[youngAdultsTestChurnData$ProbChurn > churnThreshold, ]
+
 # Combine the Subsets into 1 Dataset
 combinedChurnOnly <- rbind(churnAvg, churnFamily, churnFliers, churnGenZ, churnPioneer, churnYoungAdults)
 
 ## Run it for the other 5 Models
-# 1. Average RF
-#head(select(combinedChurnOnly, Churn, AverageProbChurn), 10)
+# +----------------------+
+# |    Average bundle    |
+# +----------------------+
 predict(rfModelAvg, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$AverageProbChurn <- predict(rfModelAvg, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1370,7 +1401,9 @@ confusionMatrix(rfModelAvg.predict2, combinedChurnOnly$Churn)
 rfModelAvg.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelAvg.predict2)
 cat("Accuracy: ", rfModelAvg.accuracy2 * 100, "%.\n")
 
-# 2. Family RF
+# +---------------------+
+# |    Family bundle    |
+# +---------------------+
 predict(rfModelFamily, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$FamilyProbChurn <- predict(rfModelFamily, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1380,7 +1413,9 @@ confusionMatrix(rfModelFamily.predict2, combinedChurnOnly$Churn)
 rfModelFamily.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelFamily.predict2)
 cat("Accuracy: ", rfModelFamily.accuracy2 * 100, "%.\n")
 
-# 3. Fliers RF
+# +-----------------------+
+# |    Frequent fliers    |
+# +-----------------------+
 predict(rfModelFliers, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$FliersProbChurn <- predict(rfModelFliers, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1390,7 +1425,9 @@ confusionMatrix(rfModelFliers.predict2, combinedChurnOnly$Churn)
 rfModelFliers.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelFliers.predict2)
 cat("Accuracy: ", rfModelFliers.accuracy2 * 100, "%.\n")
 
-# 4. Gen Z
+# +-----------------------+
+# |    Gen Z streamers    |
+# +-----------------------+
 predict(rfModelGenZ, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$GenZProbChurn <- predict(rfModelGenZ, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1400,7 +1437,9 @@ confusionMatrix(rfModelGenZ.predict2, combinedChurnOnly$Churn)
 rfModelGenZ.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelGenZ.predict2)
 cat("Accuracy: ", rfModelGenZ.accuracy2 * 100, "%.\n")
 
-# 5. Pioneer
+# +--------------------------+
+# |    Pioneer generation    |
+# +--------------------------+
 predict(rfModelPioneer, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$PioneerProbChurn <- predict(rfModelPioneer, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1410,7 +1449,9 @@ confusionMatrix(rfModelPioneer.predict2, combinedChurnOnly$Churn)
 rfModelPioneer.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelPioneer.predict2)
 cat("Accuracy: ", rfModelPioneer.accuracy2 * 100, "%.\n")
 
-# 6. Young Adults
+# +--------------------+
+# |    Young adults    |
+# +--------------------+
 predict(rfModelYoungAdults, newdata = combinedChurnOnly, type = "prob")[,]
 # Make Predictions and Obtain the Probability of Churning
 combinedChurnOnly$YoungAdultsProbChurn <- predict(rfModelYoungAdults, newdata = combinedChurnOnly, type = "prob")[, 2] * 100
@@ -1421,68 +1462,245 @@ rfModelYoungAdults.accuracy2 <- mean(combinedChurnOnly$Churn == rfModelYoungAdul
 cat("Accuracy: ", rfModelYoungAdults.accuracy2 * 100, "%.\n")
 
 modelAccuracy2 <- c(rfModelAvg.accuracy2, rfModelFamily.accuracy2, rfModelFliers.accuracy2, rfModelGenZ.accuracy2, rfModelPioneer.accuracy2, rfModelYoungAdults.accuracy2)
-subsettedCombinedChurnOnly <- subset(combinedChurnOnly, select = c("AverageProbChurn", "FamilyProbChurn", "FliersProbChurn", "GenZProbChurn", "PioneerProbChurn", "YoungAdultsProbChurn"))
+subsettedCombinedChurnOnly <- subset(combinedChurnOnly, select = c("ProbChurn", "AverageProbChurn", "FamilyProbChurn", "FliersProbChurn", "GenZProbChurn", "PioneerProbChurn", "YoungAdultsProbChurn"))
+
 # Finding Better Bundles based on lowest Churn Probs
 minCol <- apply(subsettedCombinedChurnOnly, 1, function(x) {
   names(subsettedCombinedChurnOnly)[which.min(x)]
 })
+
 # Add Recommendation to Table
 subsettedCombinedChurnOnly$Recommended_Bundle <- minCol
 subsettedCombinedChurnOnly
+table(subsettedCombinedChurnOnly$Recommended_Bundle)
+
+# Get original bundle
+OriginalBundle <- c(rep('Average Bundle',     nrow(churnAvg)),
+                    rep('Family Bundle',      nrow(churnFamily)),
+                    rep('Frequent Fliers',    nrow(churnFliers)),
+                    rep('Gen Z Streamers',    nrow(churnGenZ)),
+                    rep('Pioneer Generation', nrow(churnPioneer)),
+                    rep('Young Adults',       nrow(churnYoungAdults)))
+
+
+# verify that number of rows match
+length(OriginalBundle) == nrow(subsettedCombinedChurnOnly)
+                         
 ## Append the columns together into a new table
-accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$customerID, subsettedCombinedChurnOnly)
+accuracyRFTable2 <- cbind(CustomerID = combinedChurnOnly$customerID, OriginalBundle, subsettedCombinedChurnOnly)
+
 # Verify Correct Customer ID
-nrow(accuracyRFTable2)
-nrow(subsettedCombinedChurnOnly)
+nrow(accuracyRFTable2) == nrow(subsettedCombinedChurnOnly)
 accuracyRFTable2
 
+table(accuracyRFTable2$Recommended_Bundle)
+
 # Export to CSV
-write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = TRUE)
-
-## Logistics Regression ####################################################################################################################
-model.average <- glm(Churn ~ ., family='binomial', data=averageTrainChurnData)
-
-model.family  <- glm(Churn ~ ., family='binomial', data=familyTrainChurnData)
-
-model.fliers  <- glm(Churn ~ ., family='binomial', data=fliersTrainChurnData)
-
-model.genz    <- glm(Churn ~ ., family='binomial', data=genZTrainChurnData)
-
-model.pioneer <- glm(Churn ~ ., family='binomial', data=pioneerTrainChurnData)
-
-model.adults  <- glm(Churn ~ ., family='binomial', data=youngAdultsTrainChurnData)
+write.csv(accuracyRFTable2, "accuracyRFTable2.csv", row.names = FALSE)
 
 
-# Model evaluation
+
+# ||=================================================================||
+# ||                                                                 ||
+# ||          Machine Learning Model 2: Logistic Regression          ||
+# ||                                                                 ||
+# ||=================================================================||
+
+set.seed(123)
+
+# +----------------------+
+# |    Average bundle    |
+# +----------------------+
+cv <- cv.glmnet(x=as.matrix(averageTrainChurnData[, !names(averageTrainChurnData) %in% c('Churn')]), y=averageTrainChurnData$Churn, family='binomial', alpha=1)
+model.average <- glmnet(x=averageTrainChurnData[, !names(averageTrainChurnData) %in% c('Churn')], y=averageTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.average)), as.vector(coef(model.average)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+# +---------------------+
+# |    Family bundle    |
+# +---------------------+
+cv <- cv.glmnet(x=as.matrix(familyTrainChurnData[, !names(familyTrainChurnData) %in% c('Churn')]), y=familyTrainChurnData$Churn, family='binomial', alpha=1)
+model.family <- glmnet(x=familyTrainChurnData[, !names(familyTrainChurnData) %in% c('Churn')], y=familyTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.family)), as.vector(coef(model.family)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+# +-----------------------+
+# |    Frequent fliers    |
+# +-----------------------+
+cv <- cv.glmnet(x=as.matrix(fliersTrainChurnData[, !names(fliersTrainChurnData) %in% c('Churn')]), y=fliersTrainChurnData$Churn, family='binomial', alpha=1)
+model.fliers <- glmnet(x=fliersTrainChurnData[, !names(fliersTrainChurnData) %in% c('Churn')], y=fliersTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.fliers)), as.vector(coef(model.fliers)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+# +-----------------------+
+# |    Gen Z streamers    |
+# +-----------------------+
+cv <- cv.glmnet(x=as.matrix(genZTrainChurnData[, !names(genZTrainChurnData) %in% c('Churn')]), y=genZTrainChurnData$Churn, family='binomial', alpha=1)
+model.genz <- glmnet(x=genZTrainChurnData[, !names(genZTrainChurnData) %in% c('Churn')], y=genZTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.genz)), as.vector(coef(model.genz)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+# +--------------------------+
+# |    Pioneer Generation    |
+# +--------------------------+
+cv <- cv.glmnet(x=as.matrix(pioneerTrainChurnData[, !names(pioneerTrainChurnData) %in% c('Churn')]), y=pioneerTrainChurnData$Churn, family='binomial', alpha=1)
+model.pioneer <- glmnet(x=pioneerTrainChurnData[, !names(pioneerTrainChurnData) %in% c('Churn')], y=pioneerTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.pioneer)), as.vector(coef(model.pioneer)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+# +-------------------+
+# |   Young Adults    |
+# +-------------------+
+cv <- cv.glmnet(x=as.matrix(youngAdultsTrainChurnData[, !names(youngAdultsTrainChurnData) %in% c('Churn')]), y=youngAdultsTrainChurnData$Churn, family='binomial', alpha=1)
+model.adults <- glmnet(x=youngAdultsTrainChurnData[, !names(youngAdultsTrainChurnData) %in% c('Churn')], y=youngAdultsTrainChurnData$Churn, family='binomial', alpha=1, lambda=cv$lambda.1se)
+
+coef.df <- data.frame(rownames(coef(model.adults)), as.vector(coef(model.adults)[, 1]))
+colnames(coef.df) <- c('Variable', 'Coefficient')
+coef.df <- subset(coef.df, Coefficient != 0 & Variable != '(Intercept)')
+coef.df <- arrange(coef.df, desc(Coefficient))
+
+ggplot(data=coef.df, aes(x=factor(Variable, levels=Variable), y=Coefficient)) + 
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title='Variable Coefficients', y='Coefficient', x='Variable')
+
+
+# +-----------------------+
+# |   Model Evaluation    |
+# +-----------------------+
 threshold  <- 0.5
-#nrows      <- c(nrow(df.average), nrow(df.family), nrow(df.fliers), nrow(df.genz), nrow(df.pioneer), nrow(df.adults))
-models     <- c('Average Bundle', 'Family Bundle', 'Frequent Fliers', 'Gen Z Streamers', 'Pioneer', 'Young Adults')
 accuracies <- rep(0, 6)
+models     <- c('Average Bundle', 
+                'Family Bundle', 
+                'Frequent Fliers', 
+                'Gen Z Streamers', 
+                'Pioneer', 
+                'Young Adults')
 
-preds <- predict(model.average, averageTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[1] <- sum(preds==averageTestChurnData$Churn) / nrow(averageTestChurnData) # accuracy
 
-preds <- predict(model.family, familyTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[2] <- sum(preds==familyTestChurnData$Churn) / nrow(familyTestChurnData) # accuracy
 
-preds <- predict(model.fliers, fliersTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[3] <- sum(preds==fliersTestChurnData$Churn) / nrow(fliersTestChurnData) # accuracy
+averageTestChurnData$Assigned.Bundle     <- NULL
+familyTestChurnData$Assigned.Bundle      <- NULL
+fliersTestChurnData$Assigned.Bundle      <- NULL
+genZTestChurnData$Assigned.Bundle        <- NULL
+pioneerTestChurnData$Assigned.Bundle     <- NULL
+youngAdultsTestChurnData$Assigned.Bundle <- NULL
 
-preds <- predict(model.genz, genZTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[4] <- sum(preds==genZTestChurnData$Churn) / nrow(genZTestChurnData) # accuracy
+averageTestChurnData$ProbChurn     <- predict(model.average, newx=as.matrix(averageTestChurnData[,     !names(averageTestChurnData)     %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+familyTestChurnData$ProbChurn      <- predict(model.family,  newx=as.matrix(familyTestChurnData[,      !names(familyTestChurnData)      %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+fliersTestChurnData$ProbChurn      <- predict(model.fliers,  newx=as.matrix(fliersTestChurnData[,      !names(fliersTestChurnData)      %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+genZTestChurnData$ProbChurn        <- predict(model.genz,    newx=as.matrix(genZTestChurnData[,        !names(genZTestChurnData)        %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+pioneerTestChurnData$ProbChurn     <- predict(model.pioneer, newx=as.matrix(pioneerTestChurnData[,     !names(pioneerTestChurnData)     %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
+youngAdultsTestChurnData$ProbChurn <- predict(model.adults,  newx=as.matrix(youngAdultsTestChurnData[, !names(youngAdultsTestChurnData) %in% c('Churn', 'customerID', 'ProbChurn')]), type='response')
 
-preds <- predict(model.pioneer, pioneerTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[5] <- sum(preds==pioneerTestChurnData$Churn) / nrow(pioneerTestChurnData) # accuracy
+churnThreshold   <- 0.8
+churnAvg         <- averageTestChurnData[averageTestChurnData$ProbChurn         > churnThreshold, ]
+churnFamily      <- familyTestChurnData[familyTestChurnData$ProbChurn           > churnThreshold, ]
+churnFliers      <- fliersTestChurnData[fliersTestChurnData$ProbChurn           > churnThreshold, ]
+churnGenZ        <- genZTestChurnData[genZTestChurnData$ProbChurn               > churnThreshold, ]
+churnPioneer     <- pioneerTestChurnData[pioneerTestChurnData$ProbChurn         > churnThreshold, ]
+churnYoungAdults <- youngAdultsTestChurnData[youngAdultsTestChurnData$ProbChurn > churnThreshold, ]
 
-preds <- predict(model.adults, youngAdultsTestChurnData, type='response')
-preds <- ifelse(preds < threshold, 0, 1)
-accuracies[6] <- sum(preds==youngAdultsTestChurnData$Churn) / nrow(youngAdultsTestChurnData) # accuracy
+# Combine the subsets into 1 dataset
+combinedChurnOnly <- rbind(churnAvg, churnFamily, churnFliers, churnGenZ, churnPioneer, churnYoungAdults)
 
-# data.table(models, accuracies, nrows)
+averageTestChurnData$ProbChurn      <- NULL
+familyTestChurnData$ProbChurn       <- NULL
+fliersTestChurnData$ProbChurn       <- NULL
+genZTestChurnData$ProbChurn         <- NULL
+pioneerTestChurnData$ProbChurn      <- NULL
+youngAdultsTestChurnData$ProbChurn  <- NULL
+
+averageTestChurnData$customerID     <- NULL
+familyTestChurnData$customerID      <- NULL
+fliersTestChurnData$customerID      <- NULL
+genZTestChurnData$customerID        <- NULL
+pioneerTestChurnData$customerID     <- NULL
+youngAdultsTestChurnData$customerID <- NULL
+
+# evaluate model accuracy
+preds         <- predict(model.average, newx=as.matrix(averageTestChurnData[, !names(averageTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[1] <- mean(preds==averageTestChurnData$Churn) # accuracy
+
+preds         <- predict(model.family, newx=as.matrix(familyTestChurnData[, !names(familyTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[2] <- mean(preds==familyTestChurnData$Churn) # accuracy
+
+preds         <- predict(model.fliers, newx=as.matrix(fliersTestChurnData[, !names(fliersTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[3] <- mean(preds==fliersTestChurnData$Churn) # accuracy
+
+preds         <- predict(model.genz, newx=as.matrix(genZTestChurnData[, !names(genZTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[4] <- mean(preds==genZTestChurnData$Churn) # accuracy
+
+preds         <- predict(model.pioneer, newx=as.matrix(pioneerTestChurnData[, !names(pioneerTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[5] <- mean(preds==pioneerTestChurnData$Churn) # accuracy
+
+preds         <- predict(model.adults, newx=as.matrix(youngAdultsTestChurnData[, !names(youngAdultsTestChurnData) %in% c('Churn')]), type='response')
+preds         <- ifelse(preds < threshold, 0, 1)
+accuracies[6] <- mean(preds==youngAdultsTestChurnData$Churn) # accuracy
+
 data.table(models, accuracies)
+
+# simulate deployment
+# for customers facing high probability of churn, we fit their data into the other 5 models & recommend optimal bundle
+combined.matrix <- as.matrix(combinedChurnOnly[, !names(combinedChurnOnly) %in% c('customerID', 'Churn', 'ProbChurn')])
+
+combinedChurnOnly$average <- predict(model.average, newx=combined.matrix, type='response')
+combinedChurnOnly$family  <- predict(model.family,  newx=combined.matrix, type='response')
+combinedChurnOnly$fliers  <- predict(model.fliers,  newx=combined.matrix, type='response')
+combinedChurnOnly$genz    <- predict(model.genz,    newx=combined.matrix, type='response')
+combinedChurnOnly$pioneer <- predict(model.pioneer, newx=combined.matrix, type='response')
+combinedChurnOnly$adults  <- predict(model.adults,  newx=combined.matrix, type='response')
+
+combinedChurnOnlyProbs <- combinedChurnOnly[, c('average', 'family', 'fliers', 'genz', 'pioneer', 'adults')]
+combinedChurnOnlyProbs$recomm <- apply(combinedChurnOnlyProbs, 1, function(x) {
+  names(combinedChurnOnlyProbs)[which.min(x)]
+})
+combinedChurnOnlyFinal <- cbind(combinedChurnOnly[, c('customerID', 'ProbChurn')], combinedChurnOnlyProbs)
+
+table(combinedChurnOnlyFinal$recomm)
 
